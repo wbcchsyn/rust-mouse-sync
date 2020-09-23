@@ -37,3 +37,22 @@ use core::sync::atomic::AtomicU8;
 pub struct Mutex8 {
     mutexes: AtomicU8,
 }
+
+impl Mutex8 {
+    /// Creates a new instance without any lock.
+    pub const fn new() -> Self {
+        Self {
+            mutexes: AtomicU8::new(0),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn constructor() {
+        let _mutexes = Mutex8::new();
+    }
+}
