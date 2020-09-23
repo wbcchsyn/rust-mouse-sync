@@ -47,6 +47,12 @@ impl Mutex8 {
     }
 }
 
+/// `Lock8` is a RAII Lock object of Mutex8.
+pub struct Lock8<'a> {
+    mutex8: &'a Mutex8,
+    holdings: u8,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
