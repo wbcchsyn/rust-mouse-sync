@@ -29,8 +29,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_docs)]
-
-//! # mouse-sync
-
-pub mod mutex;
+//! `mutex` provides struct `Mutex8`
