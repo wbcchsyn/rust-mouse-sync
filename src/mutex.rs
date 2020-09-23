@@ -30,3 +30,10 @@
 // limitations under the License.
 
 //! `mutex` provides struct `Mutex8`
+
+use core::sync::atomic::AtomicU8;
+
+/// `Mutex8` is constituded of 8 mutexes.
+pub struct Mutex8 {
+    mutexes: AtomicU8,
+}
