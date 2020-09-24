@@ -74,6 +74,14 @@ impl Lock8<'_> {
     }
 }
 
+impl Drop for Lock8<'_> {
+    fn drop(&mut self) {
+        if self.holdings() != 0 {
+            unsafe { self.release(self.holdings()) };
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
