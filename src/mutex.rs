@@ -77,6 +77,26 @@ impl Mutex8 {
             }
         }
     }
+
+    /// Acquires `new_locks` and returns them.
+    ///
+    /// If any of `new_locks` is locked, block till it is released.
+    pub fn lock(&self, new_locks: u8) -> Lock8 {
+        let mut expected = 0;
+        loop {
+            match unsafe { Lock8::new(self, expected, new_locks) } {
+                Ok(g) => return g,
+                Err(current) => {
+                    if (current & new_locks) == 0 {
+                        expected = current;
+                        continue;
+                    } else {
+                        std::thread::yield_now();
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// `Lock8` is a RAII Lock object of Mutex8.
@@ -183,6 +203,18 @@ mod tests {
                     assert_eq!(i, guard.holdings());
                 }
             }
+        }
+    }
+
+    #[test]
+    fn lock() {
+        let mutex8 = Mutex8::new();
+
+        for i in 0..=u8::MAX {
+            assert_eq!(0, mutex8.state());
+            let guard = mutex8.lock(i);
+            assert_eq!(i, guard.holdings());
+            assert_eq!(i, mutex8.state());
         }
     }
 }
