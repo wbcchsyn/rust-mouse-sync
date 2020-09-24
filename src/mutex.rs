@@ -46,6 +46,12 @@ impl Mutex8 {
             mutexes: AtomicU8::new(0),
         }
     }
+
+    #[cfg(test)]
+    /// Returns a bit indicating currently locked state.
+    fn state(&self) -> u8 {
+        self.mutexes.load(Ordering::SeqCst)
+    }
 }
 
 /// `Lock8` is a RAII Lock object of Mutex8.
@@ -124,8 +130,10 @@ mod tests {
         let mutexes = Mutex8::new();
 
         for i in 0..=u8::MAX {
+            assert_eq!(0, mutexes.state());
             let guard = unsafe { Lock8::new(&mutexes, 0, i).unwrap() };
             assert_eq!(i, guard.holdings());
+            assert_eq!(i, mutexes.state());
         }
     }
 }
