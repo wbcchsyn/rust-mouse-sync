@@ -33,6 +33,7 @@
 
 use core::result::Result;
 use core::sync::atomic::{AtomicU8, Ordering};
+pub use std::sync::{TryLockError, TryLockResult};
 
 /// `Mutex8` is constituded of 8 mutexes.
 pub struct Mutex8 {
@@ -51,6 +52,25 @@ impl Mutex8 {
     /// Returns a bit indicating currently locked state.
     fn state(&self) -> u8 {
         self.mutexes.load(Ordering::SeqCst)
+    }
+
+    /// Tries to lock `new_locks` and returns it if succeeded; otherwise, i.e.
+    /// in case of lock competition, returns an error.
+    pub fn try_lock(&self, new_locks: u8) -> TryLockResult<Lock8> {
+        let mut expected = 0;
+        loop {
+            match unsafe { Lock8::new(self, expected, new_locks) } {
+                Ok(g) => return Ok(g),
+                Err(current) => {
+                    if (current & new_locks) == 0 {
+                        expected = current;
+                        continue;
+                    } else {
+                        return Err(TryLockError::WouldBlock);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -134,6 +154,30 @@ mod tests {
             let guard = unsafe { Lock8::new(&mutexes, 0, i).unwrap() };
             assert_eq!(i, guard.holdings());
             assert_eq!(i, mutexes.state());
+        }
+    }
+
+    #[test]
+    fn try_lock() {
+        let mutex8 = Mutex8::new();
+
+        for i in 0..=u8::MAX {
+            assert_eq!(0, mutex8.state());
+            let guard = mutex8.try_lock(i).unwrap();
+            assert_eq!(i, guard.holdings());
+
+            for j in 0..=u8::MAX {
+                let r = mutex8.try_lock(j);
+
+                if (i & j) == 0 {
+                    let guard = r.unwrap();
+                    assert_eq!(j, guard.holdings());
+                    assert_eq!(i + j, mutex8.state());
+                } else {
+                    assert!(r.is_err());
+                    assert_eq!(i, guard.holdings());
+                }
+            }
         }
     }
 }
