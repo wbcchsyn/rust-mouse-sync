@@ -31,6 +31,7 @@
 
 //! `mutex` provides struct `Mutex8`
 
+use core::result::Result;
 use core::sync::atomic::{AtomicU8, Ordering};
 
 /// `Mutex8` is constituded of 8 mutexes.
@@ -51,6 +52,33 @@ impl Mutex8 {
 pub struct Lock8<'a> {
     mutex8: &'a Mutex8,
     holdings_: u8,
+}
+
+impl<'a> Lock8<'a> {
+    /// Tries to create a new instance holding `new_locks`.
+    ///
+    /// `expected` is assumption of bits currently locked.
+    /// If the assumption is right, returns `Self` wrapped with Ok, or current lock state wrapped with Err.
+    ///
+    /// # Safety
+    ///
+    /// The behavior is undefined if any bit is included both in `expected` and `new_locks` .
+    unsafe fn new(mutex8: &'a Mutex8, expected: u8, new_locks: u8) -> Result<Self, u8> {
+        debug_assert_eq!(0, expected & new_locks);
+
+        let current =
+            mutex8
+                .mutexes
+                .compare_and_swap(expected, expected + new_locks, Ordering::Acquire);
+        if current == expected {
+            Ok(Self {
+                mutex8,
+                holdings_: new_locks,
+            })
+        } else {
+            Err(current)
+        }
+    }
 }
 
 impl Lock8<'_> {
@@ -89,5 +117,15 @@ mod tests {
     #[test]
     fn constructor() {
         let _mutexes = Mutex8::new();
+    }
+
+    #[test]
+    fn lock_guard8_constructor() {
+        let mutexes = Mutex8::new();
+
+        for i in 0..=u8::MAX {
+            let guard = unsafe { Lock8::new(&mutexes, 0, i).unwrap() };
+            assert_eq!(i, guard.holdings());
+        }
     }
 }
