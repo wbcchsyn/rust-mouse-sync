@@ -50,7 +50,14 @@ impl Mutex8 {
 /// `Lock8` is a RAII Lock object of Mutex8.
 pub struct Lock8<'a> {
     mutex8: &'a Mutex8,
-    holdings: u8,
+    holdings_: u8,
+}
+
+impl Lock8<'_> {
+    /// Returns a bits representing holding locks.
+    pub fn holdings(&self) -> u8 {
+        self.holdings_
+    }
 }
 
 #[cfg(test)]
