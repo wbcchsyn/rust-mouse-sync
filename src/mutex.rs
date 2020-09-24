@@ -31,7 +31,7 @@
 
 //! `mutex` provides struct `Mutex8`
 
-use core::sync::atomic::AtomicU8;
+use core::sync::atomic::{AtomicU8, Ordering};
 
 /// `Mutex8` is constituded of 8 mutexes.
 pub struct Mutex8 {
@@ -57,6 +57,20 @@ impl Lock8<'_> {
     /// Returns a bits representing holding locks.
     pub fn holdings(&self) -> u8 {
         self.holdings_
+    }
+
+    /// Releases some of the holding lock(s).
+    ///
+    /// # Safety
+    ///
+    /// The behavior is undefined if `locks` includes bit(s) not holding.
+    pub unsafe fn release(&mut self, locks: u8) {
+        debug_assert_eq!(locks, self.holdings() & locks);
+
+        let _prev = self.mutex8.mutexes.fetch_sub(locks, Ordering::Release);
+        debug_assert_eq!(locks, _prev & locks);
+
+        self.holdings_ -= locks;
     }
 }
 
