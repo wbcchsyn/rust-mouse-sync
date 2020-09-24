@@ -34,3 +34,5 @@
 //! # mouse-sync
 
 pub mod mutex;
+
+pub use mutex::*;
