@@ -36,6 +36,7 @@ use core::sync::atomic::{AtomicU8, Ordering};
 pub use std::sync::{TryLockError, TryLockResult};
 
 /// `Mutex8` is constituded of 8 mutexes.
+/// This does not adopt poison strategy.
 pub struct Mutex8 {
     mutexes: AtomicU8,
 }
@@ -56,6 +57,10 @@ impl Mutex8 {
 
     /// Tries to lock `new_locks` and returns it if succeeded; otherwise, i.e.
     /// in case of lock competition, returns an error.
+    /// (Because `Mutex8` does not adopt poison strategy, this method won't fail
+    /// unless lock competition.)
+    ///
+    /// This method will not block.
     pub fn try_lock(&self, new_locks: u8) -> TryLockResult<Lock8> {
         let mut expected = 0;
         loop {
