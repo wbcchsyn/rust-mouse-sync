@@ -49,6 +49,11 @@ impl Mutex8 {
         }
     }
 
+    /// Returns how much mutexes this struct owns.
+    pub const fn len() -> usize {
+        8
+    }
+
     #[cfg(test)]
     /// Returns a bit indicating currently locked state.
     fn state(&self) -> u8 {
