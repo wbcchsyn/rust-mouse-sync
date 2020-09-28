@@ -177,6 +177,21 @@ pub struct Mutex8Guard<'a, T: ?Sized + 'a> {
     ptr: NonNull<T>,
 }
 
+impl<'a, T: ?Sized + 'a> Mutex8Guard<'a, T> {
+    /// Creates a new instance.
+    ///
+    /// # Safety
+    ///
+    /// This function will not guarantee `lock` is associated with `data` .
+    /// The caller must ensure the lifetime of the actual data referenced by `data` .
+    pub unsafe fn new(lock: Lock8<'a>, data: &T) -> Self {
+        Self {
+            _lock: lock,
+            ptr: NonNull::from(data),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,5 +247,14 @@ mod tests {
             assert_eq!(i, guard.holdings());
             assert_eq!(i, mutex8.state());
         }
+    }
+
+    #[test]
+    fn guard() {
+        let n = 10;
+        let mutex8 = Mutex8::new();
+
+        let lock = mutex8.lock(1);
+        let _guard = unsafe { Mutex8Guard::new(lock, &n) };
     }
 }
