@@ -31,6 +31,7 @@
 
 //! `mutex` provides struct `Mutex8`
 
+use core::ops::Deref;
 use core::ptr::NonNull;
 use core::result::Result;
 use core::sync::atomic::{AtomicU8, Ordering};
@@ -192,6 +193,13 @@ impl<'a, T: ?Sized + 'a> Mutex8Guard<'a, T> {
     }
 }
 
+impl<T: ?Sized> Deref for Mutex8Guard<'_, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.as_ref() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,6 +263,8 @@ mod tests {
         let mutex8 = Mutex8::new();
 
         let lock = mutex8.lock(1);
-        let _guard = unsafe { Mutex8Guard::new(lock, &n) };
+        let guard = unsafe { Mutex8Guard::new(lock, &n) };
+
+        assert_eq!(10, *guard);
     }
 }
