@@ -31,6 +31,7 @@
 
 //! `mutex` provides struct `Mutex8`
 
+use core::ptr::NonNull;
 use core::result::Result;
 use core::sync::atomic::{AtomicU8, Ordering};
 pub use std::sync::{TryLockError, TryLockResult};
@@ -164,6 +165,16 @@ impl Drop for Lock8<'_> {
             unsafe { self.release(self.holdings()) };
         }
     }
+}
+
+/// An RAII object of `&mut T` wrapped in `Lock8` .
+/// The lock will be released when this struct is dropped.
+///
+/// The protected data can be accessed through this guard via
+/// its `Deref` implementation.
+pub struct Mutex8Guard<'a, T: ?Sized + 'a> {
+    _lock: Lock8<'a>,
+    ptr: NonNull<T>,
 }
 
 #[cfg(test)]
