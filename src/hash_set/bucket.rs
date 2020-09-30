@@ -35,3 +35,21 @@ use super::node::Node;
 ///
 /// This struct forms forward linked list by itself.
 pub struct Bucket<T>(*mut Node<T>);
+
+impl<T> Default for Bucket<T> {
+    fn default() -> Self {
+        Self(core::ptr::null_mut())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_alloc::TestBox;
+
+    #[test]
+    fn constructor() {
+        let _bucket = Bucket::<i32>::default();
+        let _bucket = Bucket::<TestBox<i32>>::default();
+    }
+}
