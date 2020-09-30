@@ -28,3 +28,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use super::node::Node;
+
+/// Bucket for "chaining hash set".
+///
+/// This struct forms forward linked list by itself.
+pub struct Bucket<T>(*mut Node<T>);
