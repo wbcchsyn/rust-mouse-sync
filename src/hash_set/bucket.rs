@@ -87,6 +87,24 @@ impl<T> Bucket<T> {
         self.iter().any(predicate)
     }
 
+    /// Returns a pointer to the element which equals to `value` if any.
+    pub fn get<U: ?Sized, V: ?Sized>(&mut self, value: &V) -> Option<*mut Node<T>>
+    where
+        T: Deref<Target = U>,
+        U: Borrow<V>,
+        V: Eq,
+    {
+        let predicate = |item: &*mut Node<T>| unsafe {
+            let t: &T = (&**item).as_ref();
+            let u: &U = &*t;
+            let v: &V = u.borrow();
+
+            value == v
+        };
+
+        self.iter().find(predicate)
+    }
+
     fn iter(&self) -> Self {
         Self(self.0)
     }
@@ -183,5 +201,68 @@ mod tests {
         assert_eq!(true, bucket.contains(&1));
         assert_eq!(true, bucket.contains(&2));
         assert_eq!(false, bucket.contains(&3));
+    }
+
+    #[test]
+    fn get_int() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<Box<i32>>> = (0..3).map(Box::new).map(Node::from).collect();
+
+        unsafe {
+            assert!(bucket.get(&0).is_none());
+            assert!(bucket.get(&1).is_none());
+            assert!(bucket.get(&2).is_none());
+            assert!(bucket.get(&3).is_none());
+
+            bucket.push(&mut nodes[0]);
+            assert_eq!(nodes.as_ptr().add(0), bucket.get(&0).unwrap());
+            assert!(bucket.get(&1).is_none());
+            assert!(bucket.get(&2).is_none());
+            assert!(bucket.get(&3).is_none());
+
+            bucket.push(&mut nodes[1]);
+            assert_eq!(nodes.as_ptr().add(0), bucket.get(&0).unwrap());
+            assert_eq!(nodes.as_ptr().add(1), bucket.get(&1).unwrap());
+            assert!(bucket.get(&2).is_none());
+            assert!(bucket.get(&3).is_none());
+
+            bucket.push(&mut nodes[2]);
+            assert_eq!(nodes.as_ptr().add(0), bucket.get(&0).unwrap());
+            assert_eq!(nodes.as_ptr().add(1), bucket.get(&1).unwrap());
+            assert_eq!(nodes.as_ptr().add(2), bucket.get(&2).unwrap());
+            assert!(bucket.get(&3).is_none());
+        }
+    }
+
+    #[test]
+    fn get_box() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<TestBox<i32>>> =
+            (0..3).map(|i| Node::from(TestBox::from(i))).collect();
+
+        unsafe {
+            assert!(bucket.get(&0).is_none());
+            assert!(bucket.get(&1).is_none());
+            assert!(bucket.get(&2).is_none());
+            assert!(bucket.get(&3).is_none());
+
+            bucket.push(&mut nodes[0]);
+            assert_eq!(nodes.as_ptr().add(0), bucket.get(&0).unwrap());
+            assert!(bucket.get(&1).is_none());
+            assert!(bucket.get(&2).is_none());
+            assert!(bucket.get(&3).is_none());
+
+            bucket.push(&mut nodes[1]);
+            assert_eq!(nodes.as_ptr().add(0), bucket.get(&0).unwrap());
+            assert_eq!(nodes.as_ptr().add(1), bucket.get(&1).unwrap());
+            assert!(bucket.get(&2).is_none());
+            assert!(bucket.get(&3).is_none());
+
+            bucket.push(&mut nodes[2]);
+            assert_eq!(nodes.as_ptr().add(0), bucket.get(&0).unwrap());
+            assert_eq!(nodes.as_ptr().add(1), bucket.get(&1).unwrap());
+            assert_eq!(nodes.as_ptr().add(2), bucket.get(&2).unwrap());
+            assert!(bucket.get(&3).is_none());
+        }
     }
 }
