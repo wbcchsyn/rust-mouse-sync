@@ -31,6 +31,7 @@
 
 use super::bucket::Bucket;
 use crate::Mutex8;
+use core::alloc::Layout;
 use core::hash::BuildHasher;
 
 /// Buckets for a "chaining hash set".
@@ -50,4 +51,17 @@ where
 /// objects.
 fn mutex8_count(chain_len: usize) -> usize {
     (chain_len + Mutex8::len() - 1) / Mutex8::len()
+}
+
+/// Calculates `Layout` to allocate both `[Bucket<T>; chain_len]` and `[Mutex8]` to protect the each bucket
+/// at once.
+///
+/// Returns `(layout, offset)`, where `layout` is the calculated `Layout` and `offset` is the relative location
+/// (in bytes,) to start at `[Mutex8]` .
+/// (`[Bucket]` starts at offset 0.)
+fn layout<T>(chain_len: usize) -> (Layout, usize) {
+    let buckets_layout = Layout::array::<Bucket<T>>(chain_len).unwrap();
+    let mutexes_layout = Layout::array::<Mutex8>(mutex8_count(chain_len)).unwrap();
+
+    buckets_layout.extend(mutexes_layout).unwrap()
 }
