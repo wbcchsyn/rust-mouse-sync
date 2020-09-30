@@ -55,6 +55,12 @@ impl<T> Iterator for Bucket<T> {
     }
 }
 
+impl<T> Bucket<T> {
+    fn iter(&self) -> Self {
+        Self(self.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
