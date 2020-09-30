@@ -42,6 +42,19 @@ impl<T> Default for Bucket<T> {
     }
 }
 
+impl<T> Iterator for Bucket<T> {
+    type Item = *mut Node<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unsafe {
+            self.0.as_mut().map(|r| {
+                self.0 = r.next();
+                r as *mut Node<T>
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
