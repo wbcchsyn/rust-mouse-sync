@@ -105,6 +105,32 @@ impl<T> Bucket<T> {
         self.iter().find(predicate)
     }
 
+    /// Removes `node` from `self` .
+    ///
+    /// # Safety
+    ///
+    /// The behavior is undefined if `self` does not own `node` .
+    pub unsafe fn remove(&mut self, node: &Node<T>) {
+        // If node is the first element, remove it and return.
+        if (self.0 as *const Node<T>) == node {
+            self.0 = node.next();
+            return;
+        }
+
+        // This dereference is OK because self must has node.
+        let mut prev = &mut *self.0;
+        let mut cur = prev.next();
+        loop {
+            if (cur as *const Node<T>) == node {
+                prev.set_next(node.next());
+                return;
+            } else {
+                prev = &mut *cur;
+                cur = (&*cur).next();
+            }
+        }
+    }
+
     fn iter(&self) -> Self {
         Self(self.0)
     }
@@ -263,6 +289,91 @@ mod tests {
             assert_eq!(nodes.as_ptr().add(1), bucket.get(&1).unwrap());
             assert_eq!(nodes.as_ptr().add(2), bucket.get(&2).unwrap());
             assert!(bucket.get(&3).is_none());
+        }
+    }
+
+    #[test]
+    fn remove_int() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<Box<i32>>> = (0..5).map(Box::new).map(Node::from).collect();
+
+        for n in nodes.iter_mut() {
+            bucket.push(n);
+        }
+
+        unsafe {
+            assert_eq!(5, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&0));
+            bucket.remove(&nodes[0]);
+            assert_eq!(false, bucket.contains(&0));
+
+            assert_eq!(4, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&4));
+            bucket.remove(&nodes[4]);
+            assert_eq!(false, bucket.contains(&4));
+
+            assert_eq!(3, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&2));
+            bucket.remove(&nodes[2]);
+            assert_eq!(false, bucket.contains(&2));
+
+            assert_eq!(2, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&1));
+            bucket.remove(&nodes[1]);
+            assert_eq!(false, bucket.contains(&1));
+
+            assert_eq!(1, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&3));
+            bucket.remove(&nodes[3]);
+            assert_eq!(false, bucket.contains(&3));
+        }
+    }
+
+    #[test]
+    fn remove_box() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<TestBox<i32>>> =
+            (0..5).map(|i| Node::from(TestBox::from(i))).collect();
+
+        for n in nodes.iter_mut() {
+            bucket.push(n);
+        }
+
+        unsafe {
+            assert_eq!(5, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&0));
+            bucket.remove(&nodes[0]);
+            assert_eq!(false, bucket.contains(&0));
+
+            assert_eq!(4, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&4));
+            bucket.remove(&nodes[4]);
+            assert_eq!(false, bucket.contains(&4));
+
+            assert_eq!(3, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&2));
+            bucket.remove(&nodes[2]);
+            assert_eq!(false, bucket.contains(&2));
+
+            assert_eq!(2, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&1));
+            bucket.remove(&nodes[1]);
+            assert_eq!(false, bucket.contains(&1));
+
+            assert_eq!(1, bucket.iter().count());
+
+            assert_eq!(true, bucket.contains(&3));
+            bucket.remove(&nodes[3]);
+            assert_eq!(false, bucket.contains(&3));
         }
     }
 }
