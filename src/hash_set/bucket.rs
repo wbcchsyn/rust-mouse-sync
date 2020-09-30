@@ -30,6 +30,8 @@
 // limitations under the License.
 
 use super::node::Node;
+use core::ops::Deref;
+use std::borrow::Borrow;
 
 /// Bucket for "chaining hash set".
 ///
@@ -66,6 +68,23 @@ impl<T> Bucket<T> {
     pub fn push(&mut self, node: &mut Node<T>) {
         node.set_next(self.0);
         self.0 = node
+    }
+
+    /// Returns true if `self` has an element which equals to `value` , or false.
+    pub fn contains<U: ?Sized, V: ?Sized>(&self, value: &V) -> bool
+    where
+        T: Deref<Target = U>,
+        U: Borrow<V>,
+        V: Eq,
+    {
+        let predicate = |item: *mut Node<T>| unsafe {
+            let t: &T = (&*item).as_ref();
+            let u: &U = &*t;
+            let v: &V = u.borrow();
+            value == v
+        };
+
+        self.iter().any(predicate)
     }
 
     fn iter(&self) -> Self {
@@ -105,5 +124,64 @@ mod tests {
             assert_eq!(i, bucket.iter().count());
             bucket.push(&mut nodes[i]);
         }
+    }
+
+    #[test]
+    fn contains_int() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<Box<i32>>> = (0..3).map(Box::new).map(Node::from).collect();
+
+        assert_eq!(false, bucket.contains(&0));
+        assert_eq!(false, bucket.contains(&1));
+        assert_eq!(false, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
+
+        bucket.push(&mut nodes[0]);
+        assert_eq!(true, bucket.contains(&0));
+        assert_eq!(false, bucket.contains(&1));
+        assert_eq!(false, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
+
+        bucket.push(&mut nodes[1]);
+        assert_eq!(true, bucket.contains(&0));
+        assert_eq!(true, bucket.contains(&1));
+        assert_eq!(false, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
+
+        bucket.push(&mut nodes[2]);
+        assert_eq!(true, bucket.contains(&0));
+        assert_eq!(true, bucket.contains(&1));
+        assert_eq!(true, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
+    }
+
+    #[test]
+    fn contains_box() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<TestBox<i32>>> =
+            (0..3).map(|i| Node::from(TestBox::from(i))).collect();
+
+        assert_eq!(false, bucket.contains(&0));
+        assert_eq!(false, bucket.contains(&1));
+        assert_eq!(false, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
+
+        bucket.push(&mut nodes[0]);
+        assert_eq!(true, bucket.contains(&0));
+        assert_eq!(false, bucket.contains(&1));
+        assert_eq!(false, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
+
+        bucket.push(&mut nodes[1]);
+        assert_eq!(true, bucket.contains(&0));
+        assert_eq!(true, bucket.contains(&1));
+        assert_eq!(false, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
+
+        bucket.push(&mut nodes[2]);
+        assert_eq!(true, bucket.contains(&0));
+        assert_eq!(true, bucket.contains(&1));
+        assert_eq!(true, bucket.contains(&2));
+        assert_eq!(false, bucket.contains(&3));
     }
 }
