@@ -45,3 +45,9 @@ where
 
     hasher_builder: B,
 }
+
+/// Returns necessary and sufficient count of `Mutex8` to protect `chain_len` count
+/// objects.
+fn mutex8_count(chain_len: usize) -> usize {
+    (chain_len + Mutex8::len() - 1) / Mutex8::len()
+}
