@@ -46,3 +46,9 @@ impl<T> From<T> for Node<T> {
         }
     }
 }
+
+impl<T> AsRef<T> for Node<T> {
+    fn as_ref(&self) -> &T {
+        &self.element
+    }
+}
