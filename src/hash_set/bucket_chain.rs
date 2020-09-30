@@ -30,10 +30,12 @@
 // limitations under the License.
 
 use super::bucket::Bucket;
-use crate::Mutex8;
+use crate::{Lock8, Mutex8};
 use core::alloc::{GlobalAlloc, Layout};
-use core::hash::BuildHasher;
+use core::hash::{BuildHasher, Hash, Hasher};
+use core::ops::Deref;
 use std::alloc::handle_alloc_error;
+use std::borrow::Borrow;
 
 /// Buckets for a "chaining hash set".
 pub struct BucketChain<T, B>
@@ -114,6 +116,32 @@ where
     fn drop(&mut self) {
         assert!(self.buckets_ptr.is_null());
         assert!(self.mutexes_ptr.is_null());
+    }
+}
+
+impl<T, B> BucketChain<T, B>
+where
+    B: BuildHasher,
+{
+    /// Accessor to the bucket which should store `value` .
+    pub fn bucket<U: ?Sized, V: ?Sized>(&self, value: &V) -> (Lock8, &mut Bucket<T>)
+    where
+        T: Deref<Target = U>,
+        U: Borrow<V>,
+        V: Hash,
+    {
+        let mut hasher = self.hasher_builder.build_hasher();
+        value.hash(&mut hasher);
+        let hash = hasher.finish() as usize;
+        let index = hash % self.buckets_len;
+
+        let mutex8 = unsafe { &*self.mutexes_ptr.add(index / Mutex8::len()) };
+        let bit: u8 = 0x01 << (index % Mutex8::len());
+        let lock = mutex8.lock(bit);
+
+        let bucket = unsafe { &mut *self.buckets_ptr.add(index) };
+
+        (lock, bucket)
     }
 }
 
