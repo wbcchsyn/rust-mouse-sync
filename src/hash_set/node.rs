@@ -37,3 +37,12 @@ pub struct Node<T> {
     element: T,
     next_: *mut Self,
 }
+
+impl<T> From<T> for Node<T> {
+    fn from(element: T) -> Self {
+        Self {
+            element,
+            next_: core::ptr::null_mut(),
+        }
+    }
+}
