@@ -28,3 +28,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use super::bucket::Bucket;
+use crate::Mutex8;
+use core::hash::BuildHasher;
+
+/// Buckets for a "chaining hash set".
+pub struct BucketChain<T, B>
+where
+    B: BuildHasher,
+{
+    buckets_ptr: *mut Bucket<T>,
+    buckets_len: usize,
+
+    mutexes_ptr: *const Mutex8,
+
+    hasher_builder: B,
+}
