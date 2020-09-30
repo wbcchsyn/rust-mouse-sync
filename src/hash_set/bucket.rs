@@ -56,6 +56,18 @@ impl<T> Iterator for Bucket<T> {
 }
 
 impl<T> Bucket<T> {
+    /// Appends `node` to `self` .
+    ///
+    /// This method should compute in O(1) time.
+    ///
+    /// # Warnings
+    ///
+    /// This method will not check duplication at all.
+    pub fn push(&mut self, node: &mut Node<T>) {
+        node.set_next(self.0);
+        self.0 = node
+    }
+
     fn iter(&self) -> Self {
         Self(self.0)
     }
@@ -70,5 +82,28 @@ mod tests {
     fn constructor() {
         let _bucket = Bucket::<i32>::default();
         let _bucket = Bucket::<TestBox<i32>>::default();
+    }
+
+    #[test]
+    fn push_int() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<i32>> = (0..10).map(Node::from).collect();
+
+        for i in 0..nodes.len() {
+            assert_eq!(i, bucket.iter().count());
+            bucket.push(&mut nodes[i]);
+        }
+    }
+
+    #[test]
+    fn push_box() {
+        let mut bucket = Bucket::default();
+        let mut nodes: Vec<Node<TestBox<i32>>> =
+            (0..10).map(|i| Node::from(TestBox::from(i))).collect();
+
+        for i in 0..nodes.len() {
+            assert_eq!(i, bucket.iter().count());
+            bucket.push(&mut nodes[i]);
+        }
     }
 }
