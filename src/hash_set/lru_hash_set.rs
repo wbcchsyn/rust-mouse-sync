@@ -30,3 +30,15 @@
 // limitations under the License.
 
 //! `LruHashSet` is a thread-safe hash set to order the elements by "Least Recently Used (LRU)".
+
+use super::node::Node;
+
+/// Entry of `LruHashSet` .
+///
+/// The node of `LruHashSet` will be `Node<Entry<T>>` .
+/// It has 2 links to order the nodes by "LRU".
+struct Entry<T> {
+    element: T,
+    prev: *mut Node<Self>,
+    next: *mut Node<Self>,
+}
