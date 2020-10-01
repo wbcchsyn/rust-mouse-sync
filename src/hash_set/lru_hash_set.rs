@@ -29,9 +29,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `hash_set` provides implementations of thread-safe hash set.
-
-mod bucket;
-mod bucket_chain;
-pub mod lru_hash_set;
-mod node;
+//! `LruHashSet` is a thread-safe hash set to order the elements by "Least Recently Used (LRU)".
