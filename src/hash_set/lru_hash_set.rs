@@ -31,8 +31,12 @@
 
 //! `LruHashSet` is a thread-safe hash set to order the elements by "Least Recently Used (LRU)".
 
+use super::bucket_chain::BucketChain;
 use super::node::Node;
-use core::hash::{Hash, Hasher};
+use crate::Mutex8;
+use core::alloc::GlobalAlloc;
+use core::cell::Cell;
+use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
 use core::ptr::null_mut;
 
@@ -74,4 +78,19 @@ impl<T> Deref for Entry<T> {
     fn deref(&self) -> &Self::Target {
         &self.element
     }
+}
+
+/// Implementation of thread-safe hash set, which orders the elements by "Least Recent Used (LRU)".
+pub struct LruHashSet<T, B, A>
+where
+    B: BuildHasher,
+    A: GlobalAlloc,
+{
+    chain: BucketChain<Entry<T>, B>,
+
+    order_mutex: Mutex8,
+    lru: Cell<*mut Node<Entry<T>>>,
+    mru: Cell<*mut Node<Entry<T>>>,
+
+    alloc: A,
 }
