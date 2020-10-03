@@ -34,7 +34,7 @@
 use super::bucket_chain::BucketChain;
 use super::node::Node;
 use crate::Mutex8;
-use core::alloc::GlobalAlloc;
+use core::alloc::{GlobalAlloc, Layout};
 use core::cell::Cell;
 use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
@@ -120,5 +120,47 @@ where
 
             alloc,
         }
+    }
+}
+
+impl<T, B, A> Drop for LruHashSet<T, B, A>
+where
+    B: BuildHasher,
+    A: GlobalAlloc,
+{
+    fn drop(&mut self) {
+        unsafe {
+            let mut ptr = self.lru.get();
+
+            while let Some(node) = ptr.as_mut() {
+                let next = node.as_ref().next;
+
+                ptr.drop_in_place();
+
+                let layout = Layout::new::<Node<Entry<T>>>();
+                self.alloc.dealloc(ptr as *mut u8, layout);
+
+                ptr = next;
+            }
+
+            self.chain.pre_drop(&self.alloc);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_alloc::{TestAlloc, TestBox};
+    use std::collections::hash_map::RandomState;
+
+    fn construct<T>(bucket_count: usize) -> LruHashSet<T, RandomState, TestAlloc> {
+        LruHashSet::new(bucket_count, RandomState::new(), TestAlloc::default())
+    }
+
+    #[test]
+    fn constructor() {
+        let _lru = construct::<i32>(100);
+        let _lru = construct::<TestBox<i32>>(100);
     }
 }
