@@ -94,3 +94,31 @@ where
 
     alloc: A,
 }
+
+impl<T, B, A> LruHashSet<T, B, A>
+where
+    B: BuildHasher,
+    A: GlobalAlloc,
+{
+    /// Creates a new instance.
+    ///
+    /// `LruHashSet` is a chaining hash set and `bucket_count` is the length of the bucket chain.
+    ///
+    /// It has the following affects to make `bucket_count` large.
+    ///
+    /// - Reducing hash conflict properbility. (This is characteristics of chaining hash set.)
+    /// - Reducing lock wait time.
+    ///   (Because `LruHashSet` locks each bucket. More bucket will reduce hash conflict and lock competition.)
+    /// - Increasing memory usage for bucket_chain.
+    pub fn new(bucket_count: usize, hasher_builder: B, alloc: A) -> Self {
+        Self {
+            chain: BucketChain::new(bucket_count, hasher_builder, &alloc),
+
+            order_mutex: Mutex8::new(),
+            lru: Cell::new(null_mut()),
+            mru: Cell::new(null_mut()),
+
+            alloc,
+        }
+    }
+}
