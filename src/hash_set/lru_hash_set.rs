@@ -32,6 +32,7 @@
 //! `LruHashSet` is a thread-safe hash set to order the elements by "Least Recently Used (LRU)".
 
 use super::node::Node;
+use core::ptr::null_mut;
 
 /// Entry of `LruHashSet` .
 ///
@@ -41,4 +42,14 @@ struct Entry<T> {
     element: T,
     prev: *mut Node<Self>,
     next: *mut Node<Self>,
+}
+
+impl<T> From<T> for Entry<T> {
+    fn from(element: T) -> Self {
+        Self {
+            element,
+            prev: null_mut(),
+            next: null_mut(),
+        }
+    }
 }
