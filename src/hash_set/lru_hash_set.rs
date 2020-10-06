@@ -171,6 +171,43 @@ where
 
         ptr
     }
+
+    /// Makes a new node least recently used element.
+    fn push_back(&self, node: &mut Node<Entry<T>>) {
+        debug_assert!(node.as_ref().prev.is_null());
+        debug_assert!(node.as_ref().next.is_null());
+
+        // Append node to the next of self.mru when self.mru is not null.
+        let mut append = || {
+            let prev_mru = unsafe { &mut *self.mru.get() };
+            prev_mru.as_mut().next = node;
+
+            node.as_mut().prev = prev_mru;
+            self.mru.set(node);
+        };
+
+        let lock = self.order_mutex.lock(Self::MRU_LOCK_BIT);
+
+        if self.mru.get().is_null() {
+            // This is the first element.
+            drop(lock);
+            let _lock = self
+                .order_mutex
+                .lock(Self::LRU_LOCK_BIT + Self::MRU_LOCK_BIT);
+
+            // Make sure again that no other element is.
+            if self.mru.get().is_null() {
+                self.mru.set(node);
+                self.lru.set(node);
+            } else {
+                // Another element is inserted while acquiring the lock.
+                append();
+            }
+        } else {
+            // This is not the first element.
+            append();
+        }
+    }
 }
 
 #[cfg(test)]
