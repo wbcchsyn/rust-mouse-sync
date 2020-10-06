@@ -154,6 +154,9 @@ where
     B: BuildHasher,
     A: GlobalAlloc,
 {
+    const LRU_LOCK_BIT: u8 = 0x01;
+    const MRU_LOCK_BIT: u8 = 0x02;
+
     /// Allocates and initializes a new node.
     fn alloc_node(&self, element: T) -> *mut Node<Entry<T>> {
         let layout = Layout::new::<Node<Entry<T>>>();
