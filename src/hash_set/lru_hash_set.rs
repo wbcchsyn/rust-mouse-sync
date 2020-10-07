@@ -32,6 +32,7 @@
 //! `LruHashSet` is a thread-safe hash set to order the elements by "Least Recently Used (LRU)".
 
 use super::node::Node;
+use core::hash::{Hash, Hasher};
 use core::ptr::null_mut;
 
 /// Entry of `LruHashSet` .
@@ -51,5 +52,17 @@ impl<T> From<T> for Entry<T> {
             prev: null_mut(),
             next: null_mut(),
         }
+    }
+}
+
+impl<T> Hash for Entry<T>
+where
+    T: Hash,
+{
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.element.hash(state);
     }
 }
