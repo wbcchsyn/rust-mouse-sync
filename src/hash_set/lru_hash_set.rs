@@ -208,6 +208,43 @@ where
             append();
         }
     }
+
+    /// Makes a node LRU.
+    fn move_back(&self, node: &mut Node<Entry<T>>) {
+        let _lock = self
+            .order_mutex
+            .lock(Self::LRU_LOCK_BIT + Self::MRU_LOCK_BIT);
+
+        // Pop node from the order list.
+        {
+            // Fix the prev link of the next node.
+            match unsafe { node.as_ref().next.as_mut() } {
+                // Do nothing if node is already the LRU.
+                None => return,
+                // Fix the link.
+                Some(next) => next.as_mut().prev = node.as_ref().prev,
+            }
+
+            // Fix the next link of the previous node.
+            if let Some(prev) = unsafe { node.as_ref().prev.as_mut() } {
+                // node is not the LRU.
+                prev.as_mut().next = node.as_ref().next;
+            } else {
+                // node is LRU currently.
+                self.lru.set(node.as_ref().next);
+            }
+        }
+
+        // Append node to the end of the list.
+        {
+            let prev_mru = unsafe { &mut *self.mru.get() };
+
+            node.as_mut().next = null_mut();
+            node.as_mut().prev = prev_mru;
+            prev_mru.as_mut().next = node;
+            self.mru.set(node);
+        }
+    }
 }
 
 #[cfg(test)]
