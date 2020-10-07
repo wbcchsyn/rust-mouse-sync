@@ -40,6 +40,7 @@ use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
 use core::ptr::null_mut;
 use std::alloc::handle_alloc_error;
+use std::borrow::Borrow;
 
 /// Entry of `LruHashSet` .
 ///
@@ -188,6 +189,28 @@ where
         unsafe { (Mutex8Guard::new(lock, element), is_new) }
     }
 
+    /// Returns a reference to the element which equals to `element` if any.
+    ///
+    /// The returned value is wrapped by the lock.
+    /// The caller should not call another methods of `self` before dropping it to escape
+    /// dead lock.
+    pub fn get<U>(&self, value: &U) -> Option<Mutex8Guard<T>>
+    where
+        T: Borrow<U>,
+        U: Hash + Eq,
+    {
+        let (lock, bucket) = self.chain.bucket(&value);
+
+        bucket.get(&value).map(|p_node| unsafe {
+            let node = &mut *p_node;
+            self.move_back(node);
+
+            let element = &node.as_ref().element;
+
+            Mutex8Guard::new(lock, element)
+        })
+    }
+
     const LRU_LOCK_BIT: u8 = 0x01;
     const MRU_LOCK_BIT: u8 = 0x02;
 
@@ -332,6 +355,48 @@ mod tests {
             let (j, b) = lru.get_or_insert(TestBox::from(i));
             assert_eq!(i, **j);
             assert_eq!(false, b);
+        }
+    }
+
+    #[test]
+    fn get_int() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            lru.get_or_insert(i);
+        }
+
+        // Get elements in lru.
+        for i in 0..100 {
+            let j = lru.get(&i).unwrap();
+            assert_eq!(i, *j);
+        }
+
+        // Try to get elements not in lru.
+        for i in -100..0 {
+            assert!(lru.get(&i).is_none());
+        }
+    }
+
+    #[test]
+    fn get_box() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            lru.get_or_insert(TestBox::from(i));
+        }
+
+        // Get elements in lru.
+        for i in 0..100 {
+            let j = lru.get(&i).unwrap();
+            assert_eq!(i, **j);
+        }
+
+        // Try to get elements not in lru.
+        for i in -100..0 {
+            assert!(lru.get(&i).is_none());
         }
     }
 }
