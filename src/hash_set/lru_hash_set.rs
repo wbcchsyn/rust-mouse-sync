@@ -33,6 +33,7 @@
 
 use super::node::Node;
 use core::hash::{Hash, Hasher};
+use core::ops::Deref;
 use core::ptr::null_mut;
 
 /// Entry of `LruHashSet` .
@@ -64,5 +65,13 @@ where
         H: Hasher,
     {
         self.element.hash(state);
+    }
+}
+
+impl<T> Deref for Entry<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.element
     }
 }
