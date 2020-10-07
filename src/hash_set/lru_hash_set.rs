@@ -211,6 +211,22 @@ where
         })
     }
 
+    /// Returns true if `self` contains element which equals to `value` , or false.
+    pub fn contains<U>(&self, value: &U) -> bool
+    where
+        T: Borrow<U>,
+        U: Hash + Eq,
+    {
+        let (_lock, bucket) = self.chain.bucket(&value);
+        bucket
+            .get(&value)
+            .map(|p_node| unsafe {
+                let node = &mut *p_node;
+                self.move_back(node);
+            })
+            .is_some()
+    }
+
     const LRU_LOCK_BIT: u8 = 0x01;
     const MRU_LOCK_BIT: u8 = 0x02;
 
@@ -397,6 +413,46 @@ mod tests {
         // Try to get elements not in lru.
         for i in -100..0 {
             assert!(lru.get(&i).is_none());
+        }
+    }
+
+    #[test]
+    fn contains_int() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            lru.get_or_insert(i);
+        }
+
+        // Get elements in lru.
+        for i in 0..100 {
+            assert_eq!(true, lru.contains(&i));
+        }
+
+        // Try to get elements not in lru.
+        for i in -100..0 {
+            assert_eq!(false, lru.contains(&i));
+        }
+    }
+
+    #[test]
+    fn contains_box() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            lru.get_or_insert(TestBox::from(i));
+        }
+
+        // Get elements in lru.
+        for i in 0..100 {
+            assert_eq!(true, lru.contains(&i));
+        }
+
+        // Try to get elements not in lru.
+        for i in -100..0 {
+            assert_eq!(false, lru.contains(&i));
         }
     }
 }
