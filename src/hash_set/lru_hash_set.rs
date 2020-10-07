@@ -33,7 +33,7 @@
 
 use super::bucket_chain::BucketChain;
 use super::node::Node;
-use crate::Mutex8;
+use crate::{Mutex8, Mutex8Guard};
 use core::alloc::{GlobalAlloc, Layout};
 use core::cell::Cell;
 use core::hash::{BuildHasher, Hash, Hasher};
@@ -154,6 +154,40 @@ where
     B: BuildHasher,
     A: GlobalAlloc,
 {
+    /// Returns a reference to the element which equals to `element` if any, otherwise inserts
+    /// `element` into `self` and returns it.
+    ///
+    /// The return value is `(ref_T, is_new)` , where `ref_T` is a reference to the element
+    /// stored in `self` wrapped in the lock and `is_new` is inserted newly or not.
+    ///
+    /// The caller should not call another methods of `self` before dropping `ref_T` to escape
+    /// dead lock.
+    pub fn get_or_insert(&self, element: T) -> (Mutex8Guard<T>, bool)
+    where
+        T: Hash + Eq,
+    {
+        let (lock, bucket) = self.chain.bucket(&element);
+
+        let (node, is_new) = match bucket.get(&element) {
+            None => {
+                let ptr = self.alloc_node(element);
+                let node = unsafe { &mut *ptr };
+                bucket.push(node);
+                self.push_back(node);
+                (node, true)
+            }
+            Some(ptr) => {
+                let node = unsafe { &mut *ptr };
+                self.move_back(node);
+                (node, false)
+            }
+        };
+
+        let element = &node.as_ref().element;
+
+        unsafe { (Mutex8Guard::new(lock, element), is_new) }
+    }
+
     const LRU_LOCK_BIT: u8 = 0x01;
     const MRU_LOCK_BIT: u8 = 0x02;
 
@@ -261,5 +295,43 @@ mod tests {
     fn constructor() {
         let _lru = construct::<i32>(100);
         let _lru = construct::<TestBox<i32>>(100);
+    }
+
+    #[test]
+    fn get_or_insert_int() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            let (j, b) = lru.get_or_insert(i);
+            assert_eq!(i, *j);
+            assert_eq!(true, b);
+        }
+
+        // Insert elements again.
+        for i in 0..100 {
+            let (j, b) = lru.get_or_insert(i);
+            assert_eq!(i, *j);
+            assert_eq!(false, b);
+        }
+    }
+
+    #[test]
+    fn get_or_insert_box() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            let (j, b) = lru.get_or_insert(TestBox::from(i));
+            assert_eq!(i, **j);
+            assert_eq!(true, b);
+        }
+
+        // Insert elements again.
+        for i in 0..100 {
+            let (j, b) = lru.get_or_insert(TestBox::from(i));
+            assert_eq!(i, **j);
+            assert_eq!(false, b);
+        }
     }
 }
