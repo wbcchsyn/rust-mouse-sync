@@ -52,3 +52,9 @@ impl<T> AsRef<T> for Node<T> {
         &self.element
     }
 }
+
+impl<T> AsMut<T> for Node<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.element
+    }
+}
