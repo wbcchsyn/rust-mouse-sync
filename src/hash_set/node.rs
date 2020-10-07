@@ -58,3 +58,15 @@ impl<T> AsMut<T> for Node<T> {
         &mut self.element
     }
 }
+
+impl<T> Node<T> {
+    /// Accessor to `next` .
+    pub fn next(&self) -> *mut Self {
+        self.next_
+    }
+
+    /// Modifier for `next` .
+    pub fn set_next(&mut self, next: *mut Self) {
+        self.next_ = next;
+    }
+}
