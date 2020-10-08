@@ -107,6 +107,16 @@ where
     }
 }
 
+impl<T, B> Drop for BucketChain<T, B>
+where
+    B: BuildHasher,
+{
+    fn drop(&mut self) {
+        assert!(self.buckets_ptr.is_null());
+        assert!(self.mutexes_ptr.is_null());
+    }
+}
+
 /// Returns necessary and sufficient count of `Mutex8` to protect `chain_len` count
 /// objects.
 fn mutex8_count(chain_len: usize) -> usize {
@@ -129,7 +139,7 @@ fn layout<T>(chain_len: usize) -> (Layout, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_alloc::TestAlloc;
+    use crate::test_alloc::{TestAlloc, TestBox};
     use std::collections::hash_map::RandomState;
 
     #[test]
@@ -143,7 +153,7 @@ mod tests {
         {
             let alloc = TestAlloc::default();
             let mut chain =
-                BucketChain::<String, RandomState>::new(100, RandomState::new(), &alloc);
+                BucketChain::<TestBox<i32>, RandomState>::new(100, RandomState::new(), &alloc);
             unsafe { chain.pre_drop(&alloc) };
         }
     }
