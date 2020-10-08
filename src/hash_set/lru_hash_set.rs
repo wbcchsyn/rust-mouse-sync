@@ -328,6 +328,65 @@ where
         let (_lock, bucket) = self.chain.bucket(&element);
         unsafe { bucket.remove(node) };
     }
+
+    /// Removes the LRU element from the order list if any.
+    fn pop_from_order_list(&self) -> Option<&mut Node<Entry<T>>> {
+        // Pop the last element from the order list.
+        // Both locks for lru and mru are required.
+        let pop_last_one = || -> bool {
+            if self.lru.get() != self.mru.get() {
+                // Do nothing if 2 or more than 2 elements are.
+                false
+            } else {
+                self.lru.set(null_mut());
+                self.mru.set(null_mut());
+                true
+            }
+        };
+
+        // Pop the LRU element when 2 or more than 2 elements are.
+        // Lock for lru is required.
+        let pop_lru = |lru: &Node<Entry<T>>| -> bool {
+            match unsafe { lru.as_ref().next.as_mut() } {
+                None => false, // Only one element is.
+                Some(next) => {
+                    next.as_mut().prev = null_mut();
+                    self.lru.set(next);
+                    true
+                }
+            }
+        };
+
+        loop {
+            // Assume 2 or more than 2 elements are.
+            {
+                let _lock = self.order_mutex.lock(Self::LRU_LOCK_BIT);
+                match unsafe { self.lru.get().as_mut() } {
+                    None => return None, // No element is.
+                    Some(lru) => {
+                        if pop_lru(lru) {
+                            return Some(lru);
+                        }
+                    }
+                }
+            }
+
+            // Assume only one element is.
+            {
+                let _lock = self
+                    .order_mutex
+                    .lock(Self::LRU_LOCK_BIT + Self::MRU_LOCK_BIT);
+                match unsafe { self.lru.get().as_mut() } {
+                    None => return None, // No element is.
+                    Some(lru) => {
+                        if pop_last_one() {
+                            return Some(lru);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
