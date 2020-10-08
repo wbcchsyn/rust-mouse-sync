@@ -318,6 +318,16 @@ where
             self.mru.set(node);
         }
     }
+
+    /// Removes the node from the hash set.
+    fn remove_from_hash_set(&self, node: &Node<Entry<T>>)
+    where
+        T: Hash,
+    {
+        let element = &node.as_ref().element;
+        let (_lock, bucket) = self.chain.bucket(&element);
+        unsafe { bucket.remove(node) };
+    }
 }
 
 #[cfg(test)]
