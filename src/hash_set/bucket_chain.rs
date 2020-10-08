@@ -85,6 +85,26 @@ where
             hasher_builder,
         }
     }
+
+    /// Deallocate `buckets_ptr` and `mutex_ptr` .
+    ///
+    /// This method must be called before dropped.
+    ///
+    /// # Safety
+    ///
+    /// After this method is called, no method can be called except for `drop` .
+    ///
+    pub unsafe fn pre_drop<A>(&mut self, alloc: &A)
+    where
+        A: GlobalAlloc,
+    {
+        let (layout, _) = layout::<T>(self.buckets_len);
+        let ptr = self.buckets_ptr as *mut u8;
+        alloc.dealloc(ptr, layout);
+
+        self.buckets_ptr = core::ptr::null_mut();
+        self.mutexes_ptr = core::ptr::null();
+    }
 }
 
 /// Returns necessary and sufficient count of `Mutex8` to protect `chain_len` count
@@ -104,4 +124,27 @@ fn layout<T>(chain_len: usize) -> (Layout, usize) {
     let mutexes_layout = Layout::array::<Mutex8>(mutex8_count(chain_len)).unwrap();
 
     buckets_layout.extend(mutexes_layout).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_alloc::TestAlloc;
+    use std::collections::hash_map::RandomState;
+
+    #[test]
+    fn constructor() {
+        {
+            let alloc = TestAlloc::default();
+            let mut chain = BucketChain::<i32, RandomState>::new(100, RandomState::new(), &alloc);
+            unsafe { chain.pre_drop(&alloc) };
+        }
+
+        {
+            let alloc = TestAlloc::default();
+            let mut chain =
+                BucketChain::<String, RandomState>::new(100, RandomState::new(), &alloc);
+            unsafe { chain.pre_drop(&alloc) };
+        }
+    }
 }
