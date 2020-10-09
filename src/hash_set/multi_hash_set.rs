@@ -86,3 +86,26 @@ where
     chain: BucketChain<Entry<T>, B>,
     alloc: A,
 }
+
+impl<T, B, A> MultiHashSet<T, B, A>
+where
+    B: BuildHasher,
+    A: GlobalAlloc,
+{
+    /// Creates a new instance.
+    ///
+    /// `MultiHashSet` is a chaining hash set and `bucket_count` is the length of the bucket chain.
+    ///
+    /// It has the following affects to make `bucket_count` large.
+    ///
+    /// - Reducing hash conflict properbility. (This is characteristics of chaining hash set.)
+    /// - Reducing lock wait time.
+    ///   (Because `MultiHashSet` locks each bucket. More bucket will reduce hash conflict and lock competition.)
+    /// - Increasing memory usage for bucket_chain.
+    pub fn new(bucket_count: usize, hasher_builder: B, alloc: A) -> Self {
+        Self {
+            chain: BucketChain::new(bucket_count, hasher_builder, &alloc),
+            alloc,
+        }
+    }
+}
