@@ -30,3 +30,15 @@
 // limitations under the License.
 
 //! `multi_hash_set` provides implementations of thread-safe hash set
+
+use core::sync::atomic::AtomicUsize;
+
+/// Entry of `MultiHashSet` .
+///
+/// The node of `MultiHashSet` will be `Node<Entry<T>>` .
+/// `MultiHashSet` enables to store the same value many times and
+/// this has the counter of the element.
+struct Entry<T> {
+    element: T,
+    count: AtomicUsize,
+}
