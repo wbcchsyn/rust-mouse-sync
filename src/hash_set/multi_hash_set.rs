@@ -31,6 +31,7 @@
 
 //! `multi_hash_set` provides implementations of thread-safe hash set
 
+use core::hash::{Hash, Hasher};
 use core::sync::atomic::AtomicUsize;
 
 /// Entry of `MultiHashSet` .
@@ -49,5 +50,17 @@ impl<T> From<T> for Entry<T> {
             element,
             count: AtomicUsize::new(1),
         }
+    }
+}
+
+impl<T> Hash for Entry<T>
+where
+    T: Hash,
+{
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.element.hash(state);
     }
 }
