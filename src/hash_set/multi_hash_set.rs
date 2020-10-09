@@ -32,6 +32,7 @@
 //! `multi_hash_set` provides implementations of thread-safe hash set
 
 use core::hash::{Hash, Hasher};
+use core::ops::Deref;
 use core::sync::atomic::AtomicUsize;
 
 /// Entry of `MultiHashSet` .
@@ -62,5 +63,13 @@ where
         H: Hasher,
     {
         self.element.hash(state);
+    }
+}
+
+impl<T> Deref for Entry<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.element
     }
 }
