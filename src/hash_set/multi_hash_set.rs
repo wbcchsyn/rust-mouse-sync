@@ -42,3 +42,12 @@ struct Entry<T> {
     element: T,
     count: AtomicUsize,
 }
+
+impl<T> From<T> for Entry<T> {
+    fn from(element: T) -> Self {
+        Self {
+            element,
+            count: AtomicUsize::new(1),
+        }
+    }
+}
