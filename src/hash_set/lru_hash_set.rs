@@ -227,6 +227,26 @@ where
             .is_some()
     }
 
+    /// Does nothing and returns false if empty, otherwise, removes the LRU element and returns true.
+    pub fn pop_lru(&self) -> bool
+    where
+        T: Hash,
+    {
+        match self.pop_from_order_list() {
+            None => false,
+            Some(lru) => {
+                self.remove_from_hash_set(lru);
+
+                let ptr = lru as *mut Node<Entry<T>>;
+                unsafe { ptr.drop_in_place() };
+                let layout = Layout::new::<Node<Entry<T>>>();
+                unsafe { self.alloc.dealloc(ptr as *mut u8, layout) };
+
+                true
+            }
+        }
+    }
+
     const LRU_LOCK_BIT: u8 = 0x01;
     const MRU_LOCK_BIT: u8 = 0x02;
 
@@ -522,6 +542,42 @@ mod tests {
         // Try to get elements not in lru.
         for i in -100..0 {
             assert_eq!(false, lru.contains(&i));
+        }
+    }
+
+    #[test]
+    fn pop_int() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            for j in 0..i {
+                lru.get_or_insert(j);
+            }
+            for _ in 0..i {
+                assert_eq!(true, lru.pop_lru());
+            }
+            for _ in 0..10 {
+                assert_eq!(false, lru.pop_lru());
+            }
+        }
+    }
+
+    #[test]
+    fn pop_box() {
+        let lru = construct(10);
+
+        // Insert elements.
+        for i in 0..100 {
+            for j in 0..i {
+                lru.get_or_insert(TestBox::from(j));
+            }
+            for _ in 0..i {
+                assert_eq!(true, lru.pop_lru());
+            }
+            for _ in 0..10 {
+                assert_eq!(false, lru.pop_lru());
+            }
         }
     }
 }
