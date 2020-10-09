@@ -33,7 +33,7 @@
 
 use super::bucket_chain::BucketChain;
 use super::node::Node;
-use crate::{Mutex8, Mutex8Guard};
+use crate::{Lock8, Mutex8, Mutex8Guard};
 use core::alloc::{GlobalAlloc, Layout};
 use core::cell::Cell;
 use core::hash::{BuildHasher, Hash, Hasher};
@@ -407,6 +407,17 @@ where
             }
         }
     }
+}
+
+/// Iterator for LruHashSet.
+///
+/// # Wargnings
+///
+/// This struct owns global lock of the `LruHashSet` .
+/// All methods of the `LruHashSet` will cause dead lock while this struct is.
+pub struct Iter<'a, T> {
+    _lock: Lock8<'a>,
+    entry: Option<&'a Entry<T>>,
 }
 
 #[cfg(test)]
