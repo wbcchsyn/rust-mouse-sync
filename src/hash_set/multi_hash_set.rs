@@ -29,10 +29,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `hash_set` provides implementations of thread-safe hash set.
-
-mod bucket;
-mod bucket_chain;
-pub mod lru_hash_set;
-pub mod multi_hash_set;
-mod node;
+//! `multi_hash_set` provides implementations of thread-safe hash set
