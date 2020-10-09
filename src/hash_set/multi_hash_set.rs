@@ -31,7 +31,9 @@
 
 //! `multi_hash_set` provides implementations of thread-safe hash set
 
-use core::hash::{Hash, Hasher};
+use super::bucket_chain::BucketChain;
+use core::alloc::GlobalAlloc;
+use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
 use core::sync::atomic::AtomicUsize;
 
@@ -72,4 +74,15 @@ impl<T> Deref for Entry<T> {
     fn deref(&self) -> &Self::Target {
         &self.element
     }
+}
+
+/// Implementation of thread-safe hash set, which enables to store the same value
+/// many times and removes elements fully to be removed as many times to be inserted.
+pub struct MultiHashSet<T, B, A>
+where
+    B: BuildHasher,
+    A: GlobalAlloc,
+{
+    chain: BucketChain<Entry<T>, B>,
+    alloc: A,
 }
