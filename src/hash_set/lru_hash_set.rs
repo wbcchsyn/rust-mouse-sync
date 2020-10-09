@@ -247,6 +247,22 @@ where
         }
     }
 
+    /// Returns an iterator.
+    ///
+    /// # Warnings
+    ///
+    /// The returned value owns lock of `self` .
+    /// All other methods will cause a dead lock while the returned value is.
+    pub fn iter(&mut self) -> Iter<T> {
+        let _lock = self
+            .order_mutex
+            .lock(Self::LRU_LOCK_BIT + Self::MRU_LOCK_BIT);
+
+        let entry = unsafe { self.lru.get().as_ref().map(|n| n.as_ref()) };
+
+        Iter { _lock, entry }
+    }
+
     const LRU_LOCK_BIT: u8 = 0x01;
     const MRU_LOCK_BIT: u8 = 0x02;
 
