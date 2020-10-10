@@ -32,7 +32,8 @@
 //! `multi_hash_set` provides implementations of thread-safe hash set
 
 use super::bucket_chain::BucketChain;
-use core::alloc::GlobalAlloc;
+use super::node::Node;
+use core::alloc::{GlobalAlloc, Layout};
 use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
 use core::sync::atomic::AtomicUsize;
@@ -107,5 +108,42 @@ where
             chain: BucketChain::new(bucket_count, hasher_builder, &alloc),
             alloc,
         }
+    }
+}
+
+impl<T, B, A> Drop for MultiHashSet<T, B, A>
+where
+    B: BuildHasher,
+    A: GlobalAlloc,
+{
+    fn drop(&mut self) {
+        unsafe {
+            for (_, bucket) in self.chain.iter() {
+                for node in bucket.iter() {
+                    node.drop_in_place();
+                    let layout = Layout::new::<Node<Entry<T>>>();
+                    self.alloc.dealloc(node as *mut u8, layout);
+                }
+            }
+
+            self.chain.pre_drop(&self.alloc);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_alloc::{TestAlloc, TestBox};
+    use std::collections::hash_map::RandomState;
+
+    fn construct<T>(bucket_count: usize) -> MultiHashSet<T, RandomState, TestAlloc> {
+        MultiHashSet::new(bucket_count, RandomState::new(), TestAlloc::default())
+    }
+
+    #[test]
+    fn constructor() {
+        let _multi = construct::<i32>(100);
+        let _multi = construct::<TestBox<i32>>(100);
     }
 }
