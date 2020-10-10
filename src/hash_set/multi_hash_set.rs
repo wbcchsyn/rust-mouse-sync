@@ -33,10 +33,12 @@
 
 use super::bucket_chain::BucketChain;
 use super::node::Node;
+use crate::Mutex8Guard;
 use core::alloc::{GlobalAlloc, Layout};
 use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
 use core::sync::atomic::AtomicUsize;
+use std::alloc::handle_alloc_error;
 
 /// Entry of `MultiHashSet` .
 ///
@@ -128,6 +130,27 @@ where
 
             self.chain.pre_drop(&self.alloc);
         }
+    }
+}
+
+impl<T, B, A> MultiHashSet<T, B, A>
+where
+    B: BuildHasher,
+    A: GlobalAlloc,
+{
+    /// Allocates and initializes a new node.
+    fn alloc_node(&self, element: T) -> *mut Node<Entry<T>> {
+        let layout = Layout::new::<Node<Entry<T>>>();
+        let ptr = unsafe { self.alloc.alloc(layout) as *mut Node<Entry<T>> };
+        if ptr.is_null() {
+            handle_alloc_error(layout);
+        }
+
+        let entry = Entry::from(element);
+        let node = Node::from(entry);
+        unsafe { ptr.write(node) };
+
+        ptr
     }
 }
 
