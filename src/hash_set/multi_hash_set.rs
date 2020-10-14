@@ -37,7 +37,7 @@ use crate::Mutex8Guard;
 use core::alloc::{GlobalAlloc, Layout};
 use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
-use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use std::alloc::handle_alloc_error;
 
 /// Entry of `MultiHashSet` .
@@ -138,6 +138,37 @@ where
     B: BuildHasher,
     A: GlobalAlloc,
 {
+    /// Tries to find element to equal to `element` and increments the counter if any, otherwise,
+    /// adds `element` to `self` .
+    ///
+    /// This method returns `(referecne, count)` , where `reference` is a reference to the element
+    /// wrapped in the lock, and `count` is how many times the element was added before this method
+    /// is called. (i.e. if `element` is added newly, `count` will be 0.)
+    ///
+    /// Don't call method of `self` before dropping the return value to escape a dead lock.
+    pub fn get_or_insert(&self, element: T) -> (Mutex8Guard<T>, usize)
+    where
+        T: Hash + Eq,
+    {
+        let (lock, bucket) = self.chain.bucket(&element);
+        let (node, count) = match bucket.get(&element) {
+            None => {
+                let node = unsafe { &mut *self.alloc_node(element) };
+                bucket.push(node);
+                (node, 0)
+            }
+            Some(p_node) => {
+                let node = unsafe { &mut *p_node };
+                let entry = node.as_ref();
+                let count = entry.count.fetch_add(1, Ordering::Acquire);
+                (node, count)
+            }
+        };
+
+        let element = &node.as_ref().element as *const T;
+        (unsafe { Mutex8Guard::new(lock, &*element) }, count)
+    }
+
     /// Allocates and initializes a new node.
     fn alloc_node(&self, element: T) -> *mut Node<Entry<T>> {
         let layout = Layout::new::<Node<Entry<T>>>();
@@ -168,5 +199,31 @@ mod tests {
     fn constructor() {
         let _multi = construct::<i32>(100);
         let _multi = construct::<TestBox<i32>>(100);
+    }
+
+    #[test]
+    fn get_or_insert_int() {
+        let multi = construct(10);
+
+        for i in 0..10 {
+            for j in 0..100 {
+                let (r, c) = multi.get_or_insert(j);
+                assert_eq!(j, *r);
+                assert_eq!(i, c);
+            }
+        }
+    }
+
+    #[test]
+    fn get_or_insert_box() {
+        let multi = construct(10);
+
+        for i in 0..10 {
+            for j in 0..100 {
+                let (r, c) = multi.get_or_insert(TestBox::from(j));
+                assert_eq!(j, **r);
+                assert_eq!(i, c);
+            }
+        }
     }
 }
