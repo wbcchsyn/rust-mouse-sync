@@ -32,3 +32,7 @@
 #![deny(missing_docs)]
 
 //! # mouse-sync
+
+pub mod mutex;
+
+pub use mutex::*;
