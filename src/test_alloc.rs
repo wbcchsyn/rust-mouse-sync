@@ -43,3 +43,12 @@ pub struct TestAlloc {
     alloc: System,
     allocatings: Mutex<HashMap<*mut u8, Layout>>,
 }
+
+impl Default for TestAlloc {
+    fn default() -> Self {
+        Self {
+            alloc: System,
+            allocatings: Mutex::default(),
+        }
+    }
+}
