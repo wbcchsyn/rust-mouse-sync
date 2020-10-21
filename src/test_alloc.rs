@@ -83,3 +83,9 @@ unsafe impl GlobalAlloc for TestAlloc {
         self.alloc.dealloc(ptr, layout);
     }
 }
+
+/// `TestBox` behaves like `std::boxed::Box` except for using `TestAlloc` .
+pub struct TestBox<T> {
+    ptr: *mut T,
+    alloc: TestAlloc,
+}
