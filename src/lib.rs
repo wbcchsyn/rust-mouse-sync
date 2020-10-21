@@ -34,5 +34,7 @@
 //! # mouse-sync
 
 pub mod mutex;
+#[cfg(test)]
+mod test_alloc;
 
 pub use mutex::*;
