@@ -30,6 +30,7 @@
 // limitations under the License.
 
 use core::alloc::{GlobalAlloc, Layout};
+use core::ops::Deref;
 use std::alloc::{handle_alloc_error, System};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -113,5 +114,12 @@ impl<T> Drop for TestBox<T> {
             let layout = Layout::new::<T>();
             self.alloc.dealloc(self.ptr as *mut u8, layout);
         }
+    }
+}
+
+impl<T> Deref for TestBox<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.ptr }
     }
 }
