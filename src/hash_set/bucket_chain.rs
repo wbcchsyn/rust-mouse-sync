@@ -31,8 +31,9 @@
 
 use super::bucket::Bucket;
 use crate::Mutex8;
-use core::alloc::Layout;
+use core::alloc::{GlobalAlloc, Layout};
 use core::hash::BuildHasher;
+use std::alloc::handle_alloc_error;
 
 /// Buckets for a "chaining hash set".
 pub struct BucketChain<T, B>
@@ -45,6 +46,45 @@ where
     mutexes_ptr: *const Mutex8,
 
     hasher_builder: B,
+}
+
+impl<T, B> BucketChain<T, B>
+where
+    B: BuildHasher,
+{
+    /// Creates a new instance.
+    pub fn new<A>(chain_len: usize, hasher_builder: B, alloc: &A) -> Self
+    where
+        A: GlobalAlloc,
+    {
+        let (layout, offset) = layout::<T>(chain_len);
+
+        let ptr = unsafe { alloc.alloc(layout) };
+        if ptr.is_null() {
+            handle_alloc_error(layout);
+        }
+
+        let buckets_ptr = ptr as *mut Bucket<T>;
+        unsafe {
+            for i in 0..chain_len {
+                buckets_ptr.add(i).write(Bucket::default());
+            }
+        };
+
+        let mutexes_ptr = unsafe { ptr.add(offset) as *mut Mutex8 };
+        unsafe {
+            for i in 0..mutex8_count(chain_len) {
+                mutexes_ptr.add(i).write(Mutex8::new());
+            }
+        };
+
+        Self {
+            buckets_ptr,
+            buckets_len: chain_len,
+            mutexes_ptr,
+            hasher_builder,
+        }
+    }
 }
 
 /// Returns necessary and sufficient count of `Mutex8` to protect `chain_len` count
