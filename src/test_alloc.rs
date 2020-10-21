@@ -30,7 +30,7 @@
 // limitations under the License.
 
 use core::alloc::{GlobalAlloc, Layout};
-use std::alloc::System;
+use std::alloc::{handle_alloc_error, System};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -88,6 +88,22 @@ unsafe impl GlobalAlloc for TestAlloc {
 pub struct TestBox<T> {
     ptr: *mut T,
     alloc: TestAlloc,
+}
+
+impl<T> From<T> for TestBox<T> {
+    fn from(val: T) -> Self {
+        let alloc = TestAlloc::default();
+
+        let layout = Layout::new::<T>();
+        let ptr = unsafe { alloc.alloc(layout) } as *mut T;
+        if ptr.is_null() {
+            handle_alloc_error(layout);
+        }
+
+        unsafe { ptr.write(val) };
+
+        Self { ptr, alloc }
+    }
 }
 
 impl<T> Drop for TestBox<T> {
