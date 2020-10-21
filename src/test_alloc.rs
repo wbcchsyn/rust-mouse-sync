@@ -29,7 +29,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use core::alloc::Layout;
+use core::alloc::{GlobalAlloc, Layout};
 use std::alloc::System;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -57,5 +57,29 @@ impl Drop for TestAlloc {
     fn drop(&mut self) {
         let allocatings = self.allocatings.get_mut().unwrap();
         assert!(allocatings.is_empty());
+    }
+}
+
+unsafe impl GlobalAlloc for TestAlloc {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let ptr = self.alloc.alloc(layout);
+        if !ptr.is_null() {
+            let mut allocatings = self.allocatings.lock().unwrap();
+            assert!(allocatings.insert(ptr, layout).is_none());
+        }
+
+        ptr
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        let mut allocatings = self.allocatings.lock().unwrap();
+        let l = allocatings
+            .remove(&ptr)
+            .expect("Deallocating pointer which is not allocated.");
+        if l != layout {
+            panic!("Deallocating layout is not fit to the pointer.");
+        }
+
+        self.alloc.dealloc(ptr, layout);
     }
 }
