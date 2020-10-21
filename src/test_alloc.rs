@@ -28,3 +28,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use core::alloc::Layout;
+use std::alloc::System;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+/// `TestAlloc` behaves like `std::alloc::System` except for the followings.
+///
+/// - `TestAlloc::dealloc(&self, ptr: *mut u8, layout: Layout)` checks relation among
+/// `self` , `ptr` , and `layout` .
+/// - `TestAlloc` checks all allocated memories have been deallocated on drop.
+pub struct TestAlloc {
+    alloc: System,
+    allocatings: Mutex<HashMap<*mut u8, Layout>>,
+}
