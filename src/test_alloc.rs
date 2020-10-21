@@ -52,3 +52,10 @@ impl Default for TestAlloc {
         }
     }
 }
+
+impl Drop for TestAlloc {
+    fn drop(&mut self) {
+        let allocatings = self.allocatings.get_mut().unwrap();
+        assert!(allocatings.is_empty());
+    }
+}
