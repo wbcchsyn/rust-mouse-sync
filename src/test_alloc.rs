@@ -89,3 +89,13 @@ pub struct TestBox<T> {
     ptr: *mut T,
     alloc: TestAlloc,
 }
+
+impl<T> Drop for TestBox<T> {
+    fn drop(&mut self) {
+        unsafe {
+            self.ptr.drop_in_place();
+            let layout = Layout::new::<T>();
+            self.alloc.dealloc(self.ptr as *mut u8, layout);
+        }
+    }
+}
