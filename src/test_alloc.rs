@@ -158,3 +158,5 @@ where
         unsafe { (&*self.ptr) == (&*other.ptr) }
     }
 }
+
+impl<T> Eq for TestBox<T> where T: PartialEq {}
