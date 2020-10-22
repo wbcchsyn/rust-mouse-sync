@@ -30,8 +30,11 @@
 // limitations under the License.
 
 use core::alloc::{GlobalAlloc, Layout};
-use std::alloc::System;
+use core::ops::Deref;
+use std::alloc::{handle_alloc_error, System};
+use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
 
 /// `TestAlloc` behaves like `std::alloc::System` except for the followings.
@@ -83,3 +86,77 @@ unsafe impl GlobalAlloc for TestAlloc {
         self.alloc.dealloc(ptr, layout);
     }
 }
+
+/// `TestBox` behaves like `std::boxed::Box` except for using `TestAlloc` .
+pub struct TestBox<T> {
+    ptr: *mut T,
+    alloc: TestAlloc,
+}
+
+impl<T> From<T> for TestBox<T> {
+    fn from(val: T) -> Self {
+        let alloc = TestAlloc::default();
+
+        let layout = Layout::new::<T>();
+        let ptr = unsafe { alloc.alloc(layout) } as *mut T;
+        if ptr.is_null() {
+            handle_alloc_error(layout);
+        }
+
+        unsafe { ptr.write(val) };
+
+        Self { ptr, alloc }
+    }
+}
+
+impl<T> Drop for TestBox<T> {
+    fn drop(&mut self) {
+        unsafe {
+            self.ptr.drop_in_place();
+            let layout = Layout::new::<T>();
+            self.alloc.dealloc(self.ptr as *mut u8, layout);
+        }
+    }
+}
+
+impl<T> Deref for TestBox<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.ptr }
+    }
+}
+
+impl<T> AsRef<T> for TestBox<T> {
+    fn as_ref(&self) -> &T {
+        unsafe { &*self.ptr }
+    }
+}
+
+impl<T> Borrow<T> for TestBox<T> {
+    fn borrow(&self) -> &T {
+        unsafe { &*self.ptr }
+    }
+}
+
+impl<T> Hash for TestBox<T>
+where
+    T: Hash,
+{
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        unsafe { (&*self.ptr).hash(state) };
+    }
+}
+
+impl<T> PartialEq<Self> for TestBox<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { (&*self.ptr) == (&*other.ptr) }
+    }
+}
+
+impl<T> Eq for TestBox<T> where T: PartialEq {}
