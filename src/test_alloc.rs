@@ -149,3 +149,12 @@ where
         unsafe { (&*self.ptr).hash(state) };
     }
 }
+
+impl<T> PartialEq<Self> for TestBox<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { (&*self.ptr) == (&*other.ptr) }
+    }
+}
