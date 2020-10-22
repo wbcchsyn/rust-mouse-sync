@@ -32,6 +32,7 @@
 use core::alloc::{GlobalAlloc, Layout};
 use core::ops::Deref;
 use std::alloc::{handle_alloc_error, System};
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -120,6 +121,12 @@ impl<T> Drop for TestBox<T> {
 impl<T> Deref for TestBox<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
+        unsafe { &*self.ptr }
+    }
+}
+
+impl<T> Borrow<T> for TestBox<T> {
+    fn borrow(&self) -> &T {
         unsafe { &*self.ptr }
     }
 }
