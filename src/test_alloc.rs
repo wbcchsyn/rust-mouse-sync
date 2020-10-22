@@ -125,6 +125,12 @@ impl<T> Deref for TestBox<T> {
     }
 }
 
+impl<T> AsRef<T> for TestBox<T> {
+    fn as_ref(&self) -> &T {
+        unsafe { &*self.ptr }
+    }
+}
+
 impl<T> Borrow<T> for TestBox<T> {
     fn borrow(&self) -> &T {
         unsafe { &*self.ptr }
