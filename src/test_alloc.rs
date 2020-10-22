@@ -34,6 +34,7 @@ use core::ops::Deref;
 use std::alloc::{handle_alloc_error, System};
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
 
 /// `TestAlloc` behaves like `std::alloc::System` except for the followings.
@@ -134,5 +135,17 @@ impl<T> AsRef<T> for TestBox<T> {
 impl<T> Borrow<T> for TestBox<T> {
     fn borrow(&self) -> &T {
         unsafe { &*self.ptr }
+    }
+}
+
+impl<T> Hash for TestBox<T>
+where
+    T: Hash,
+{
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        unsafe { (&*self.ptr).hash(state) };
     }
 }
