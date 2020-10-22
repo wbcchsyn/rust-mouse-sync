@@ -29,13 +29,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_docs)]
+//! `hash_set` provides implementations of thread-safe hash set.
 
-//! # mouse-sync
-
-pub mod hash_set;
-pub mod mutex;
-#[cfg(test)]
-mod test_alloc;
-
-pub use mutex::*;
+mod bucket;
+mod bucket_chain;
+mod node;

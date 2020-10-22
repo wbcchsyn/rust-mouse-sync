@@ -29,13 +29,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_docs)]
+/// Node for "chaininig hash set".
+///
+/// Each bucket of "chaining hash set" forms a forward linked list, and this struct
+/// has a link to the next in the same bucket.
+pub struct Node<T> {
+    element: T,
+    next_: *mut Self,
+}
 
-//! # mouse-sync
+impl<T> From<T> for Node<T> {
+    fn from(element: T) -> Self {
+        Self {
+            element,
+            next_: core::ptr::null_mut(),
+        }
+    }
+}
 
-pub mod hash_set;
-pub mod mutex;
-#[cfg(test)]
-mod test_alloc;
+impl<T> AsRef<T> for Node<T> {
+    fn as_ref(&self) -> &T {
+        &self.element
+    }
+}
 
-pub use mutex::*;
+impl<T> AsMut<T> for Node<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.element
+    }
+}
+
+impl<T> Node<T> {
+    /// Accessor to `next` .
+    pub fn next(&self) -> *mut Self {
+        self.next_
+    }
+
+    /// Modifier for `next` .
+    pub fn set_next(&mut self, next: *mut Self) {
+        self.next_ = next;
+    }
+}
