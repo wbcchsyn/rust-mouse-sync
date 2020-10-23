@@ -146,20 +146,23 @@ where
     /// wrapped in the lock, and `count` is how many times the element was added before this method
     /// is called. (i.e. if `element` is added newly, `count` will be 0.)
     ///
+    /// # Safety
+    ///
+    /// The return value is wrapped in the lock.
     /// Don't call method of `self` before dropping the return value to escape a dead lock.
-    pub fn get_or_insert(&self, element: T) -> (Mutex8Guard<T>, usize)
+    pub unsafe fn get_or_insert(&self, element: T) -> (Mutex8Guard<T>, usize)
     where
         T: Hash + Eq,
     {
         let (lock, bucket) = self.chain.bucket(&element);
         let (node, count) = match bucket.get(&element) {
             None => {
-                let node = unsafe { &mut *self.alloc_node(element) };
+                let node = &mut *self.alloc_node(element);
                 bucket.push(node);
                 (node, 0)
             }
             Some(p_node) => {
-                let node = unsafe { &mut *p_node };
+                let node = &mut *p_node;
                 let entry = node.as_ref();
                 let count = entry.count.fetch_add(1, Ordering::Acquire);
                 (node, count)
@@ -167,7 +170,7 @@ where
         };
 
         let element = &node.as_ref().element as *const T;
-        (unsafe { Mutex8Guard::new(lock, &*element) }, count)
+        (Mutex8Guard::new(lock, &*element), count)
     }
 
     /// Finds element to equal to `element` and returns a reference and the inserted count if any.
@@ -175,21 +178,24 @@ where
     /// This method returns `(reference, count)` , where `reference` is a reference to the element
     /// wrapped in the lock, and `count` is how many times the element was added.
     ///
+    /// # Safety
+    ///
+    /// The return value is wrapped in the lock unless `None` .
     /// Don't call method of `self` before dropping the return value to escape a dead lock.
-    pub fn get<U>(&self, element: &U) -> Option<(Mutex8Guard<T>, usize)>
+    pub unsafe fn get<U>(&self, element: &U) -> Option<(Mutex8Guard<T>, usize)>
     where
         U: Hash + Eq,
         T: Borrow<U>,
     {
         let (lock, bucket) = self.chain.bucket(&element);
         bucket.get(element).map(|p_node| {
-            let node = unsafe { &*p_node };
+            let node = &*p_node;
             let entry = node.as_ref();
 
             let count = entry.count.load(Ordering::Relaxed);
             let element = &entry.element as *const T;
 
-            (unsafe { Mutex8Guard::new(lock, &*element) }, count)
+            (Mutex8Guard::new(lock, &*element), count)
         })
     }
 
@@ -263,7 +269,7 @@ mod tests {
 
         for i in 0..10 {
             for j in 0..100 {
-                let (r, c) = multi.get_or_insert(j);
+                let (r, c) = unsafe { multi.get_or_insert(j) };
                 assert_eq!(j, *r);
                 assert_eq!(i, c);
             }
@@ -276,7 +282,7 @@ mod tests {
 
         for i in 0..10 {
             for j in 0..100 {
-                let (r, c) = multi.get_or_insert(TestBox::from(j));
+                let (r, c) = unsafe { multi.get_or_insert(TestBox::from(j)) };
                 assert_eq!(j, **r);
                 assert_eq!(i, c);
             }
@@ -289,16 +295,18 @@ mod tests {
 
         for i in 0..10 {
             for j in 0..i {
-                let (_, c) = multi.get_or_insert(i);
+                let (_, c) = unsafe { multi.get_or_insert(i) };
                 assert_eq!(j, c);
             }
         }
 
-        assert!(multi.get(&0).is_none());
-        for i in 1..10 {
-            let (r, c) = multi.get(&i).unwrap();
-            assert_eq!(i, *r);
-            assert_eq!(i, c);
+        unsafe {
+            assert!(multi.get(&0).is_none());
+            for i in 1..10 {
+                let (r, c) = multi.get(&i).unwrap();
+                assert_eq!(i, *r);
+                assert_eq!(i, c);
+            }
         }
     }
 
@@ -308,16 +316,18 @@ mod tests {
 
         for i in 0..10 {
             for j in 0..i {
-                let (_, c) = multi.get_or_insert(TestBox::from(i));
+                let (_, c) = unsafe { multi.get_or_insert(TestBox::from(i)) };
                 assert_eq!(j, c);
             }
         }
 
-        assert!(multi.get(&0).is_none());
-        for i in 1..10 {
-            let (r, c) = multi.get(&i).unwrap();
-            assert_eq!(i, **r);
-            assert_eq!(i, c);
+        unsafe {
+            assert!(multi.get(&0).is_none());
+            for i in 1..10 {
+                let (r, c) = multi.get(&i).unwrap();
+                assert_eq!(i, **r);
+                assert_eq!(i, c);
+            }
         }
     }
 
@@ -327,7 +337,7 @@ mod tests {
 
         for i in 0..10 {
             for j in 0..i {
-                let (_, c) = multi.get_or_insert(i);
+                let (_, c) = unsafe { multi.get_or_insert(i) };
                 assert_eq!(j, c);
             }
         }
@@ -345,7 +355,7 @@ mod tests {
 
         for i in 0..10 {
             for j in 0..i {
-                let (_, c) = multi.get_or_insert(TestBox::from(i));
+                let (_, c) = unsafe { multi.get_or_insert(TestBox::from(i)) };
                 assert_eq!(j, c);
             }
         }

@@ -161,9 +161,12 @@ where
     /// The return value is `(ref_T, is_new)` , where `ref_T` is a reference to the element
     /// stored in `self` wrapped in the lock and `is_new` is inserted newly or not.
     ///
+    /// # Safety
+    ///
+    /// The return value owns a lock.
     /// The caller should not call another methods of `self` before dropping `ref_T` to escape
     /// dead lock.
-    pub fn get_or_insert(&self, element: T) -> (Mutex8Guard<T>, bool)
+    pub unsafe fn get_or_insert(&self, element: T) -> (Mutex8Guard<T>, bool)
     where
         T: Hash + Eq,
     {
@@ -172,36 +175,37 @@ where
         let (node, is_new) = match bucket.get(&element) {
             None => {
                 let ptr = self.alloc_node(element);
-                let node = unsafe { &mut *ptr };
+                let node = &mut *ptr;
                 bucket.push(node);
                 self.push_back(node);
                 (node, true)
             }
             Some(ptr) => {
-                let node = unsafe { &mut *ptr };
+                let node = &mut *ptr;
                 self.move_back(node);
                 (node, false)
             }
         };
 
         let element = &node.as_ref().element;
-
-        unsafe { (Mutex8Guard::new(lock, element), is_new) }
+        (Mutex8Guard::new(lock, element), is_new)
     }
 
     /// Returns a reference to the element which equals to `element` if any.
     ///
+    /// # Safety
+    ///
     /// The returned value is wrapped by the lock.
     /// The caller should not call another methods of `self` before dropping it to escape
     /// dead lock.
-    pub fn get<U>(&self, value: &U) -> Option<Mutex8Guard<T>>
+    pub unsafe fn get<U>(&self, value: &U) -> Option<Mutex8Guard<T>>
     where
         T: Borrow<U>,
         U: Hash + Eq,
     {
         let (lock, bucket) = self.chain.bucket(&value);
 
-        bucket.get(&value).map(|p_node| unsafe {
+        bucket.get(&value).map(|p_node| {
             let node = &mut *p_node;
             self.move_back(node);
 
@@ -249,16 +253,16 @@ where
 
     /// Returns an iterator.
     ///
-    /// # Warnings
+    /// # Safety
     ///
     /// The returned value owns lock of `self` .
     /// All other methods will cause a dead lock while the returned value is.
-    pub fn iter(&mut self) -> Iter<T> {
+    pub unsafe fn iter(&mut self) -> Iter<T> {
         let _lock = self
             .order_mutex
             .lock(Self::LRU_LOCK_BIT + Self::MRU_LOCK_BIT);
 
-        let entry = unsafe { self.lru.get().as_ref().map(|n| n.as_ref()) };
+        let entry = self.lru.get().as_ref().map(|n| n.as_ref());
 
         Iter { _lock, entry }
     }
@@ -472,14 +476,14 @@ mod tests {
 
         // Insert elements.
         for i in 0..100 {
-            let (j, b) = lru.get_or_insert(i);
+            let (j, b) = unsafe { lru.get_or_insert(i) };
             assert_eq!(i, *j);
             assert_eq!(true, b);
         }
 
         // Insert elements again.
         for i in 0..100 {
-            let (j, b) = lru.get_or_insert(i);
+            let (j, b) = unsafe { lru.get_or_insert(i) };
             assert_eq!(i, *j);
             assert_eq!(false, b);
         }
@@ -491,14 +495,14 @@ mod tests {
 
         // Insert elements.
         for i in 0..100 {
-            let (j, b) = lru.get_or_insert(TestBox::from(i));
+            let (j, b) = unsafe { lru.get_or_insert(TestBox::from(i)) };
             assert_eq!(i, **j);
             assert_eq!(true, b);
         }
 
         // Insert elements again.
         for i in 0..100 {
-            let (j, b) = lru.get_or_insert(TestBox::from(i));
+            let (j, b) = unsafe { lru.get_or_insert(TestBox::from(i)) };
             assert_eq!(i, **j);
             assert_eq!(false, b);
         }
@@ -510,18 +514,18 @@ mod tests {
 
         // Insert elements.
         for i in 0..100 {
-            lru.get_or_insert(i);
+            unsafe { lru.get_or_insert(i) };
         }
 
         // Get elements in lru.
         for i in 0..100 {
-            let j = lru.get(&i).unwrap();
+            let j = unsafe { lru.get(&i).unwrap() };
             assert_eq!(i, *j);
         }
 
         // Try to get elements not in lru.
         for i in -100..0 {
-            assert!(lru.get(&i).is_none());
+            assert!(unsafe { lru.get(&i).is_none() });
         }
     }
 
@@ -531,18 +535,18 @@ mod tests {
 
         // Insert elements.
         for i in 0..100 {
-            lru.get_or_insert(TestBox::from(i));
+            unsafe { lru.get_or_insert(TestBox::from(i)) };
         }
 
         // Get elements in lru.
         for i in 0..100 {
-            let j = lru.get(&i).unwrap();
+            let j = unsafe { lru.get(&i).unwrap() };
             assert_eq!(i, **j);
         }
 
         // Try to get elements not in lru.
         for i in -100..0 {
-            assert!(lru.get(&i).is_none());
+            assert!(unsafe { lru.get(&i).is_none() });
         }
     }
 
@@ -552,7 +556,7 @@ mod tests {
 
         // Insert elements.
         for i in 0..100 {
-            lru.get_or_insert(i);
+            unsafe { lru.get_or_insert(i) };
         }
 
         // Get elements in lru.
@@ -572,7 +576,7 @@ mod tests {
 
         // Insert elements.
         for i in 0..100 {
-            lru.get_or_insert(TestBox::from(i));
+            unsafe { lru.get_or_insert(TestBox::from(i)) };
         }
 
         // Get elements in lru.
@@ -593,7 +597,7 @@ mod tests {
         // Insert elements.
         for i in 0..100 {
             for j in 0..i {
-                lru.get_or_insert(j);
+                unsafe { lru.get_or_insert(j) };
             }
             for _ in 0..i {
                 assert_eq!(true, lru.pop_lru());
@@ -611,7 +615,7 @@ mod tests {
         // Insert elements.
         for i in 0..100 {
             for j in 0..i {
-                lru.get_or_insert(TestBox::from(j));
+                unsafe { lru.get_or_insert(TestBox::from(j)) };
             }
             for _ in 0..i {
                 assert_eq!(true, lru.pop_lru());
@@ -626,105 +630,107 @@ mod tests {
     fn iter() {
         let mut lru = construct(10);
 
-        // Insert elements.
-        for i in 0..100 {
-            lru.get_or_insert(i);
+        unsafe {
+            // Insert elements.
+            for i in 0..100 {
+                lru.get_or_insert(i);
+            }
+
+            // Check the order.
+            let mut iter = lru.iter();
+            (0..100).for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert!(iter.next().is_none());
+            drop(iter);
+
+            // pop '0' and check the order again.
+            lru.pop_lru();
+            let mut iter = lru.iter();
+            (1..100).for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert!(iter.next().is_none());
+            drop(iter);
+
+            // Make '50' MRU by 'contains()'.
+            assert_eq!(true, lru.contains(&50));
+            let mut iter = lru.iter();
+            (1..50)
+                .chain(51..100)
+                .chain(50..51)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
+
+            // Nothing is changed if 'contains()' returns false.
+            assert_eq!(false, lru.contains(&100));
+            let mut iter = lru.iter();
+            (1..50)
+                .chain(51..100)
+                .chain(50..51)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
+
+            // Make '51' MRU by 'get()'.
+            assert!(lru.get(&51).is_some());
+            let mut iter = lru.iter();
+            (1..50)
+                .chain(52..100)
+                .chain(50..52)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
+
+            // Nothing is changed if 'get()' returns None,
+            assert!(lru.get(&100).is_none());
+            let mut iter = lru.iter();
+            (1..50)
+                .chain(52..100)
+                .chain(50..52)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
+
+            // Make '52' MRU by 'get_or_insert()'.
+            lru.get_or_insert(52);
+            let mut iter = lru.iter();
+            (1..50)
+                .chain(53..100)
+                .chain(50..53)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
+
+            // Inert '0' by 'get_or_insert()'.
+            lru.get_or_insert(0);
+            let mut iter = lru.iter();
+            (1..50)
+                .chain(53..100)
+                .chain(50..53)
+                .chain(0..1)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
+
+            // Make the LRU element MRU.
+            assert_eq!(true, lru.contains(&1));
+            let mut iter = lru.iter();
+            (2..50)
+                .chain(53..100)
+                .chain(50..53)
+                .chain(0..2)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
+
+            // Nothing is changed to get MRU.
+            assert!(lru.get(&1).is_some());
+            let mut iter = lru.iter();
+            (2..50)
+                .chain(53..100)
+                .chain(50..53)
+                .chain(0..2)
+                .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
+            assert_eq!(true, iter.next().is_none());
+            drop(iter);
         }
-
-        // Check the order.
-        let mut iter = lru.iter();
-        (0..100).for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert!(iter.next().is_none());
-        drop(iter);
-
-        // pop '0' and check the order again.
-        lru.pop_lru();
-        let mut iter = lru.iter();
-        (1..100).for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert!(iter.next().is_none());
-        drop(iter);
-
-        // Make '50' MRU by 'contains()'.
-        assert_eq!(true, lru.contains(&50));
-        let mut iter = lru.iter();
-        (1..50)
-            .chain(51..100)
-            .chain(50..51)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
-
-        // Nothing is changed if 'contains()' returns false.
-        assert_eq!(false, lru.contains(&100));
-        let mut iter = lru.iter();
-        (1..50)
-            .chain(51..100)
-            .chain(50..51)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
-
-        // Make '51' MRU by 'get()'.
-        assert!(lru.get(&51).is_some());
-        let mut iter = lru.iter();
-        (1..50)
-            .chain(52..100)
-            .chain(50..52)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
-
-        // Nothing is changed if 'get()' returns None,
-        assert!(lru.get(&100).is_none());
-        let mut iter = lru.iter();
-        (1..50)
-            .chain(52..100)
-            .chain(50..52)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
-
-        // Make '52' MRU by 'get_or_insert()'.
-        lru.get_or_insert(52);
-        let mut iter = lru.iter();
-        (1..50)
-            .chain(53..100)
-            .chain(50..53)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
-
-        // Inert '0' by 'get_or_insert()'.
-        lru.get_or_insert(0);
-        let mut iter = lru.iter();
-        (1..50)
-            .chain(53..100)
-            .chain(50..53)
-            .chain(0..1)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
-
-        // Make the LRU element MRU.
-        assert_eq!(true, lru.contains(&1));
-        let mut iter = lru.iter();
-        (2..50)
-            .chain(53..100)
-            .chain(50..53)
-            .chain(0..2)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
-
-        // Nothing is changed to get MRU.
-        assert!(lru.get(&1).is_some());
-        let mut iter = lru.iter();
-        (2..50)
-            .chain(53..100)
-            .chain(50..53)
-            .chain(0..2)
-            .for_each(|i| assert_eq!(&i, iter.next().unwrap()));
-        assert_eq!(true, iter.next().is_none());
-        drop(iter);
     }
 }
