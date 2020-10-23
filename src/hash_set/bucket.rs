@@ -131,7 +131,8 @@ impl<T> Bucket<T> {
         }
     }
 
-    fn iter(&self) -> Self {
+    /// Returns an iterator.
+    pub fn iter(&self) -> Self {
         Self(self.0)
     }
 }
