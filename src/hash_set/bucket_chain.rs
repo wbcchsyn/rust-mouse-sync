@@ -135,13 +135,7 @@ where
         let hash = hasher.finish() as usize;
         let index = hash % self.buckets_len;
 
-        let mutex8 = unsafe { &*self.mutexes_ptr.add(index / Mutex8::len()) };
-        let bit: u8 = 0x01 << (index % Mutex8::len());
-        let lock = mutex8.lock(bit);
-
-        let bucket = unsafe { &mut *self.buckets_ptr.add(index) };
-
-        (lock, bucket)
+        self.do_bucket(index)
     }
 
     /// Returns an iterator.
@@ -150,6 +144,16 @@ where
             chain: self,
             index: 0,
         }
+    }
+
+    fn do_bucket(&self, index: usize) -> (Lock8, &mut Bucket<T>) {
+        let mutex8 = unsafe { &*self.mutexes_ptr.add(index / Mutex8::len()) };
+        let bit: u8 = 0x01 << (index % Mutex8::len());
+        let lock = mutex8.lock(bit);
+
+        let bucket = unsafe { &mut *self.buckets_ptr.add(index) };
+
+        (lock, bucket)
     }
 }
 
