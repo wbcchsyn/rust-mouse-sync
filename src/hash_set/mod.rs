@@ -34,4 +34,5 @@
 mod bucket;
 mod bucket_chain;
 pub mod lru_hash_set;
+pub mod multi_hash_set;
 mod node;
