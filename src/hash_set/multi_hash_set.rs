@@ -193,6 +193,38 @@ where
         })
     }
 
+    /// Finds element to equal to `element` and decrements the inserted count if any.
+    /// The element will be fully removed if the inserted count will be 0.
+    ///
+    /// `remove` returns the inserted count of the element before this method is called,
+    /// or 0 if no such element is. if the return value is 1, the element is fully removed.
+    pub fn remove<U>(&self, element: &U) -> usize
+    where
+        U: Hash + Eq,
+        T: Borrow<U>,
+    {
+        let (_lock, bucket) = self.chain.bucket(&element);
+        match bucket.get(element) {
+            None => 0,
+            Some(p_node) => {
+                let node = unsafe { &*p_node };
+                let entry = node.as_ref();
+
+                let count = entry.count.fetch_sub(1, Ordering::Release);
+                if count == 1 {
+                    unsafe {
+                        bucket.remove(node);
+                        p_node.drop_in_place();
+                        let layout = Layout::new::<Node<Entry<T>>>();
+                        self.alloc.dealloc(p_node as *mut u8, layout);
+                    }
+                }
+
+                count
+            }
+        }
+    }
+
     /// Allocates and initializes a new node.
     fn alloc_node(&self, element: T) -> *mut Node<Entry<T>> {
         let layout = Layout::new::<Node<Entry<T>>>();
@@ -286,6 +318,42 @@ mod tests {
             let (r, c) = multi.get(&i).unwrap();
             assert_eq!(i, **r);
             assert_eq!(i, c);
+        }
+    }
+
+    #[test]
+    fn remove_int() {
+        let multi = construct(10);
+
+        for i in 0..10 {
+            for j in 0..i {
+                let (_, c) = multi.get_or_insert(i);
+                assert_eq!(j, c);
+            }
+        }
+
+        for i in 0..10 {
+            for j in 0..=i {
+                assert_eq!(i - j, multi.remove(&i));
+            }
+        }
+    }
+
+    #[test]
+    fn remove_box() {
+        let multi = construct(10);
+
+        for i in 0..10 {
+            for j in 0..i {
+                let (_, c) = multi.get_or_insert(TestBox::from(i));
+                assert_eq!(j, c);
+            }
+        }
+
+        for i in 0..10 {
+            for j in 0..=i {
+                assert_eq!(i - j, multi.remove(&i));
+            }
         }
     }
 }
