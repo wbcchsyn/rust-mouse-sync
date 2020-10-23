@@ -166,6 +166,22 @@ where
     index: usize,
 }
 
+impl<'a, T, B> Iterator for Iter<'a, T, B>
+where
+    B: BuildHasher,
+{
+    type Item = (Lock8<'a>, &'a mut Bucket<T>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.chain.buckets_len {
+            self.index += 1;
+            Some(self.chain.do_bucket(self.index - 1))
+        } else {
+            None
+        }
+    }
+}
+
 /// Returns necessary and sufficient count of `Mutex8` to protect `chain_len` count
 /// objects.
 fn mutex8_count(chain_len: usize) -> usize {
