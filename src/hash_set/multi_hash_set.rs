@@ -39,6 +39,7 @@ use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use std::alloc::handle_alloc_error;
+use std::borrow::Borrow;
 
 /// Entry of `MultiHashSet` .
 ///
@@ -169,6 +170,29 @@ where
         (unsafe { Mutex8Guard::new(lock, &*element) }, count)
     }
 
+    /// Finds element to equal to `element` and returns a reference and the inserted count if any.
+    ///
+    /// This method returns `(reference, count)` , where `reference` is a reference to the element
+    /// wrapped in the lock, and `count` is how many times the element was added.
+    ///
+    /// Don't call method of `self` before dropping the return value to escape a dead lock.
+    pub fn get<U>(&self, element: &U) -> Option<(Mutex8Guard<T>, usize)>
+    where
+        U: Hash + Eq,
+        T: Borrow<U>,
+    {
+        let (lock, bucket) = self.chain.bucket(&element);
+        bucket.get(element).map(|p_node| {
+            let node = unsafe { &*p_node };
+            let entry = node.as_ref();
+
+            let count = entry.count.load(Ordering::Relaxed);
+            let element = &entry.element as *const T;
+
+            (unsafe { Mutex8Guard::new(lock, &*element) }, count)
+        })
+    }
+
     /// Allocates and initializes a new node.
     fn alloc_node(&self, element: T) -> *mut Node<Entry<T>> {
         let layout = Layout::new::<Node<Entry<T>>>();
@@ -224,6 +248,44 @@ mod tests {
                 assert_eq!(j, **r);
                 assert_eq!(i, c);
             }
+        }
+    }
+
+    #[test]
+    fn get_int() {
+        let multi = construct(10);
+
+        for i in 0..10 {
+            for j in 0..i {
+                let (_, c) = multi.get_or_insert(i);
+                assert_eq!(j, c);
+            }
+        }
+
+        assert!(multi.get(&0).is_none());
+        for i in 1..10 {
+            let (r, c) = multi.get(&i).unwrap();
+            assert_eq!(i, *r);
+            assert_eq!(i, c);
+        }
+    }
+
+    #[test]
+    fn get_box() {
+        let multi = construct(10);
+
+        for i in 0..10 {
+            for j in 0..i {
+                let (_, c) = multi.get_or_insert(TestBox::from(i));
+                assert_eq!(j, c);
+            }
+        }
+
+        assert!(multi.get(&0).is_none());
+        for i in 1..10 {
+            let (r, c) = multi.get(&i).unwrap();
+            assert_eq!(i, **r);
+            assert_eq!(i, c);
         }
     }
 }
