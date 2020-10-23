@@ -143,6 +143,14 @@ where
 
         (lock, bucket)
     }
+
+    /// Returns an iterator.
+    pub fn iter(&self) -> Iter<T, B> {
+        Iter {
+            chain: self,
+            index: 0,
+        }
+    }
 }
 
 /// Iterator for `BucketChain` .
