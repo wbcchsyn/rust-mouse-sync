@@ -135,6 +135,18 @@ where
         let hash = hasher.finish() as usize;
         let index = hash % self.buckets_len;
 
+        self.do_bucket(index)
+    }
+
+    /// Returns an iterator.
+    pub fn iter(&self) -> Iter<T, B> {
+        Iter {
+            chain: self,
+            index: 0,
+        }
+    }
+
+    fn do_bucket(&self, index: usize) -> (Lock8, &mut Bucket<T>) {
         let mutex8 = unsafe { &*self.mutexes_ptr.add(index / Mutex8::len()) };
         let bit: u8 = 0x01 << (index % Mutex8::len());
         let lock = mutex8.lock(bit);
@@ -142,6 +154,31 @@ where
         let bucket = unsafe { &mut *self.buckets_ptr.add(index) };
 
         (lock, bucket)
+    }
+}
+
+/// Iterator for `BucketChain` .
+pub struct Iter<'a, T, B>
+where
+    B: BuildHasher,
+{
+    chain: &'a BucketChain<T, B>,
+    index: usize,
+}
+
+impl<'a, T, B> Iterator for Iter<'a, T, B>
+where
+    B: BuildHasher,
+{
+    type Item = (Lock8<'a>, &'a mut Bucket<T>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.chain.buckets_len {
+            self.index += 1;
+            Some(self.chain.do_bucket(self.index - 1))
+        } else {
+            None
+        }
     }
 }
 
