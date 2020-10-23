@@ -145,6 +145,15 @@ where
     }
 }
 
+/// Iterator for `BucketChain` .
+pub struct Iter<'a, T, B>
+where
+    B: BuildHasher,
+{
+    chain: &'a BucketChain<T, B>,
+    index: usize,
+}
+
 /// Returns necessary and sufficient count of `Mutex8` to protect `chain_len` count
 /// objects.
 fn mutex8_count(chain_len: usize) -> usize {
